@@ -1,8 +1,10 @@
+---
+tags:
+- FRED
+- ECONOMIC
+- ML
+---
 # FRED ML - Federal Reserve Economic Data Machine Learning System
-
-[![CI/CD](https://github.com/your-org/fred-ml/actions/workflows/ci-cd.yml/badge.svg)](https://github.com/your-org/fred-ml/actions/workflows/ci-cd.yml)
-[![Tests](https://img.shields.io/badge/tests-passing-brightgreen)](https://github.com/your-org/fred-ml/actions/workflows/ci-cd.yml)
-[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 A comprehensive Machine Learning system for analyzing Federal Reserve Economic Data (FRED) with automated data processing, advanced analytics, and interactive visualizations.
 
@@ -69,7 +71,7 @@ FRED_ML/
 
 1. **Clone the repository**
    ```bash
-   git clone https://github.com/your-org/fred-ml.git
+   git clone https://huggingface.co/ParallelLLC/FREDML
    cd fred-ml
    ```
 
@@ -234,4 +236,4 @@ For support and questions:
 
 ---
 
-**FRED ML** - Transforming economic data analysis with machine learning and automation. 
+**FRED ML** - Transforming economic data analysis with machine learning and automation.
