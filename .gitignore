@@ -50,13 +50,11 @@ Thumbs.db
 .ipynb_checkpoints
 
 # Data files
-data/exports/*.png
 data/exports/*.jpg
 data/exports/*.jpeg
 data/exports/*.gif
 data/exports/*.svg
 data/exports/*.pdf
-data/processed/*.csv
 data/raw/*
 
 # Logs
