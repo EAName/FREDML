@@ -8,12 +8,38 @@ A comprehensive Machine Learning system for analyzing Federal Reserve Economic D
 
 ## 🚀 Features
 
-- **📊 Real-time Data Processing**: Automated FRED API integration
-- **🤖 Machine Learning Analytics**: Advanced statistical modeling
-- **📈 Interactive Visualizations**: Dynamic charts and dashboards
+### Core Capabilities
+- **📊 Real-time Data Processing**: Automated FRED API integration with enhanced client
+- **🔍 Data Quality Assessment**: Comprehensive data validation and quality metrics
 - **🔄 Automated Workflows**: CI/CD pipeline with quality gates
 - **☁️ Cloud-Native**: AWS Lambda and S3 integration
 - **🧪 Comprehensive Testing**: Unit, integration, and E2E tests
+
+### Advanced Analytics
+- **🤖 Statistical Modeling**: 
+  - Linear regression with lagged variables
+  - Correlation analysis (Pearson, Spearman, Kendall)
+  - Granger causality testing
+  - Comprehensive diagnostic testing (normality, homoscedasticity, autocorrelation, multicollinearity)
+  - Principal Component Analysis (PCA)
+
+- **🔮 Time Series Forecasting**:
+  - ARIMA models with automatic order selection
+  - Exponential Smoothing (ETS) models
+  - Stationarity testing (ADF, KPSS)
+  - Time series decomposition (trend, seasonal, residual)
+  - Backtesting with performance metrics (MAE, RMSE, MAPE)
+  - Confidence intervals and uncertainty quantification
+
+- **🎯 Economic Segmentation**:
+  - Time period clustering (economic regimes)
+  - Series clustering (behavioral patterns)
+  - K-means and hierarchical clustering
+  - Optimal cluster detection (elbow method, silhouette analysis)
+  - Dimensionality reduction (PCA, t-SNE)
+
+- **📈 Interactive Visualizations**: Dynamic charts and dashboards
+- **💡 Comprehensive Insights**: Automated insights extraction and key findings identification
 
 ## 📁 Project Structure
 
@@ -146,6 +172,23 @@ Access at: http://localhost:8501
 ### Command-line Demo
 ```bash
 python scripts/simple_demo.py
+```
+
+### Advanced Analytics Demo
+```bash
+# Run comprehensive analytics demo
+python scripts/comprehensive_demo.py
+
+# Run advanced analytics pipeline
+python scripts/run_advanced_analytics.py --indicators GDPC1 INDPRO RSAFS --forecast-periods 4
+
+# Run with custom parameters
+python scripts/run_advanced_analytics.py \
+  --indicators GDPC1 INDPRO RSAFS CPIAUCSL FEDFUNDS DGS10 \
+  --start-date 2010-01-01 \
+  --end-date 2024-01-01 \
+  --forecast-periods 8 \
+  --output-dir data/exports/advanced_analysis
 ```
 
 ## 🔧 Configuration
