@@ -20,29 +20,53 @@ pip install -r requirements.txt
 
 ### 2. API Key Configuration
 
-Your FRED API key is already configured in `config.py`:
-- API Key: `acf8bbec7efe3b6dfa6ae083e7152314`
+1. Get your FRED API key from [FRED API](https://fred.stlouisfed.org/docs/api/api_key.html)
+2. Copy `.env.example` to `.env`:
+   ```bash
+   cp .env.example .env
+   ```
+3. Edit `.env` and add your API key:
+   ```
+   FRED_API_KEY=your_actual_api_key_here
+   ```
 
 ### 3. Project Structure
 
 ```
-economic_output_datasets/
-├── config.py              # Configuration settings
-├── fred_data_collector.py # Main data collection script
-├── requirements.txt       # Python dependencies
-├── README.md             # This file
-├── data/                 # Output directory for CSV files
-└── plots/                # Output directory for visualizations
+FRED_ML/
+├── config/               # Configuration settings
+│   ├── settings.py       # Environment variables and settings
+│   └── pipeline.yaml     # Pipeline configuration
+├── src/                  # Source code
+│   ├── core/            # Core functionality
+│   ├── analysis/        # Analysis modules
+│   ├── utils/           # Utility functions
+│   └── visualization/   # Visualization modules
+├── scripts/             # Executable scripts
+├── tests/               # Test files
+├── data/                # Data directories
+│   ├── raw/            # Raw data
+│   ├── processed/      # Processed data
+│   └── exports/        # Exported files
+├── requirements.txt     # Python dependencies
+├── .env.example        # Environment variables template
+└── README.md           # This file
 ```
 
 ## Usage
 
 ### Basic Usage
 
-Run the main script to collect and analyze economic data:
+Run the EDA script to perform exploratory data analysis:
 
 ```bash
-python fred_data_collector.py
+python scripts/run_eda.py
+```
+
+Or run the advanced analytics:
+
+```bash
+python scripts/run_advanced_analytics.py
 ```
 
 This will:
@@ -53,13 +77,14 @@ This will:
 
 ### Custom Analysis
 
-You can customize the analysis by modifying the script:
+You can customize the analysis by importing the modules:
 
 ```python
-from fred_data_collector import FREDDataCollector
+from src.core.fred_client import FREDDataCollectorV2
+from src.analysis.advanced_analytics import AdvancedAnalytics
 
 # Initialize collector
-collector = FREDDataCollector()
+collector = FREDDataCollectorV2()
 
 # Custom series and date range
 custom_series = ['GDP', 'UNRATE', 'CPIAUCSL']
@@ -111,11 +136,12 @@ The tool includes error handling for rate limit issues.
 
 ## Configuration
 
-Edit `config.py` to customize:
-- API key (if needed)
+Edit `config/settings.py` to customize:
 - Default date ranges
 - Output directories
 - Default indicators
+
+The API key is now managed through environment variables (see Setup section above).
 
 ## Dependencies
 
