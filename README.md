@@ -1,3 +1,10 @@
+---
+tags:
+- economic
+- FRED
+- FASTAPI
+- ML
+---
 # FRED ML - Enterprise Economic Data Analysis Platform
 
 A production-grade Python platform for collecting, analyzing, and visualizing Federal Reserve Economic Data (FRED) using the FRED API. Built with enterprise-grade architecture including FastAPI, Docker, Kubernetes, and comprehensive monitoring.
@@ -277,4 +284,4 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 - **Documentation**: Check the `docs/` directory
 - **Issues**: Report bugs via GitHub Issues
-- **FRED API**: https://fred.stlouisfed.org/docs/api/ 
+- **FRED API**: https://fred.stlouisfed.org/docs/api/
