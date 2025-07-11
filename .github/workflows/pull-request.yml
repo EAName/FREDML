@@ -1,0 +1,283 @@
+name: Pull Request Checks
+
+on:
+  pull_request:
+    branches: [ main, develop ]
+  push:
+    branches: [ develop ]
+
+env:
+  AWS_REGION: us-west-2
+  S3_BUCKET: fredmlv1
+  LAMBDA_FUNCTION: fred-ml-processor
+  PYTHON_VERSION: '3.9'
+
+jobs:
+  # Code Quality Checks
+  quality:
+    name: 🔍 Code Quality
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Python ${{ env.PYTHON_VERSION }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+        
+    - name: Cache pip dependencies
+      uses: actions/cache@v3
+      with:
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-
+          
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install black flake8 mypy isort
+        
+    - name: Check code formatting
+      run: |
+        echo "🎨 Checking code formatting..."
+        black --check --diff .
+        
+    - name: Run linting
+      run: |
+        echo "🔍 Running linting..."
+        flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+        flake8 . --count --exit-zero --max-complexity=10 --max-line-length=88 --statistics
+        
+    - name: Check import sorting
+      run: |
+        echo "📦 Checking import sorting..."
+        isort --check-only --diff .
+        
+    - name: Run type checking
+      run: |
+        echo "🔍 Running type checking..."
+        mypy lambda/ frontend/ src/ --ignore-missing-imports
+
+  # Unit Tests
+  unit-tests:
+    name: 🧪 Unit Tests
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Python ${{ env.PYTHON_VERSION }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+        
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install pytest pytest-cov
+        
+    - name: Run unit tests
+      run: |
+        echo "🧪 Running unit tests..."
+        pytest tests/unit/ -v --cov=lambda --cov=frontend --cov-report=xml --cov-report=term-missing
+        
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v3
+      with:
+        file: ./coverage.xml
+        flags: unittests
+        name: codecov-umbrella
+        fail_ci_if_error: false
+
+  # Security Scan
+  security:
+    name: 🔒 Security Scan
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Run Bandit security scan
+      run: |
+        echo "🔒 Running security scan..."
+        pip install bandit
+        bandit -r lambda/ frontend/ src/ -f json -o bandit-report.json || true
+        
+    - name: Upload security report
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: security-report
+        path: bandit-report.json
+
+  # Dependency Check
+  dependencies:
+    name: 📦 Dependency Check
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Python ${{ env.PYTHON_VERSION }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+        
+    - name: Check for outdated dependencies
+      run: |
+        echo "📦 Checking for outdated dependencies..."
+        pip install pip-check-updates
+        pcu --version || echo "pip-check-updates not available"
+        
+    - name: Check for security vulnerabilities
+      run: |
+        echo "🔒 Checking for security vulnerabilities..."
+        pip install safety
+        safety check || true
+
+  # Documentation Check
+  docs:
+    name: 📚 Documentation Check
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Check README
+      run: |
+        echo "📚 Checking documentation..."
+        if [ ! -f "README.md" ]; then
+          echo "❌ README.md is missing"
+          exit 1
+        fi
+        
+        # Check for required sections
+        required_sections=("## 🏗️ Architecture" "## 🚀 Features" "## 🛠️ Setup")
+        for section in "${required_sections[@]}"; do
+          if ! grep -q "$section" README.md; then
+            echo "❌ Missing required section: $section"
+            exit 1
+          fi
+        done
+        
+        echo "✅ Documentation check passed"
+        
+    - name: Check deployment docs
+      run: |
+        if [ ! -f "docs/deployment/streamlit-cloud.md" ]; then
+          echo "❌ Streamlit Cloud deployment guide is missing"
+          exit 1
+        fi
+        echo "✅ Deployment documentation exists"
+
+  # Build Test
+  build-test:
+    name: 🏗️ Build Test
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Python ${{ env.PYTHON_VERSION }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+        
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        
+    - name: Test Lambda package creation
+      run: |
+        echo "📦 Testing Lambda package creation..."
+        cd lambda
+        pip install -r requirements.txt -t .
+        zip -r ../lambda-test-package.zip .
+        cd ..
+        
+        if [ -f "lambda-test-package.zip" ]; then
+          echo "✅ Lambda package created successfully"
+          ls -la lambda-test-package.zip
+        else
+          echo "❌ Lambda package creation failed"
+          exit 1
+        fi
+        
+    - name: Test Streamlit app import
+      run: |
+        echo "🎨 Testing Streamlit app imports..."
+        python -c "import sys; sys.path.append('frontend'); from app import load_config, init_aws_clients; print('✅ Streamlit app imports successfully')"
+
+  # Comment Results
+  comment:
+    name: 💬 Comment Results
+    runs-on: ubuntu-latest
+    needs: [quality, unit-tests, security, dependencies, docs, build-test]
+    if: github.event_name == 'pull_request'
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Download test results
+      uses: actions/download-artifact@v3
+      with:
+        name: test-results
+        
+    - name: Create PR comment
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const fs = require('fs');
+          
+          let comment = '## 🧪 Pull Request Test Results\n\n';
+          
+          // Check job results
+          const jobs = ['quality', 'unit-tests', 'security', 'dependencies', 'docs', 'build-test'];
+          let passed = 0;
+          let total = jobs.length;
+          
+          for (const job of jobs) {
+            const result = context.payload.workflow_run?.conclusion || 'unknown';
+            const status = result === 'success' ? '✅' : '❌';
+            comment += `${status} **${job}**: ${result}\n`;
+            if (result === 'success') passed++;
+          }
+          
+          comment += `\n**Summary**: ${passed}/${total} checks passed\n\n`;
+          
+          if (passed === total) {
+            comment += '🎉 All checks passed! This PR is ready for review.\n';
+          } else {
+            comment += '⚠️ Some checks failed. Please review and fix the issues.\n';
+          }
+          
+          // Add test coverage if available
+          try {
+            const coverage = fs.readFileSync('coverage.xml', 'utf8');
+            const coverageMatch = coverage.match(/<coverage.*?line-rate="([^"]+)"/);
+            if (coverageMatch) {
+              const coveragePercent = Math.round(parseFloat(coverageMatch[1]) * 100);
+              comment += `\n📊 **Test Coverage**: ${coveragePercent}%\n`;
+            }
+          } catch (e) {
+            // Coverage file not available
+          }
+          
+          github.rest.issues.createComment({
+            issue_number: context.issue.number,
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            body: comment
+          }); 

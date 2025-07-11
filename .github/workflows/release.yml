@@ -1,0 +1,233 @@
+name: Release Deployment
+
+on:
+  release:
+    types: [published]
+
+env:
+  AWS_REGION: us-west-2
+  S3_BUCKET: fredmlv1
+  LAMBDA_FUNCTION: fred-ml-processor
+  PYTHON_VERSION: '3.9'
+
+jobs:
+  # Create Release Assets
+  create-assets:
+    name: 📦 Create Release Assets
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Python ${{ env.PYTHON_VERSION }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+        
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        
+    - name: Create Lambda deployment package
+      run: |
+        echo "📦 Creating Lambda deployment package..."
+        cd lambda
+        pip install -r requirements.txt -t .
+        zip -r ../lambda-release-${{ github.event.release.tag_name }}.zip .
+        cd ..
+        
+    - name: Create documentation package
+      run: |
+        echo "📚 Creating documentation package..."
+        tar -czf docs-release-${{ github.event.release.tag_name }}.tar.gz docs/
+        
+    - name: Create test results package
+      run: |
+        echo "🧪 Creating test results package..."
+        python scripts/test_complete_system.py --report-only
+        tar -czf test-results-${{ github.event.release.tag_name }}.tar.gz test_report.json
+        
+    - name: Upload release assets
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ github.event.release.upload_url }}
+        asset_path: ./lambda-release-${{ github.event.release.tag_name }}.zip
+        asset_name: lambda-deployment-${{ github.event.release.tag_name }}.zip
+        asset_content_type: application/zip
+        
+    - name: Upload documentation
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ github.event.release.upload_url }}
+        asset_path: ./docs-release-${{ github.event.release.tag_name }}.tar.gz
+        asset_name: documentation-${{ github.event.release.tag_name }}.tar.gz
+        asset_content_type: application/gzip
+        
+    - name: Upload test results
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ github.event.release.upload_url }}
+        asset_path: ./test-results-${{ github.event.release.tag_name }}.tar.gz
+        asset_name: test-results-${{ github.event.release.tag_name }}.tar.gz
+        asset_content_type: application/gzip
+
+  # Deploy to Production
+  deploy-production:
+    name: 🚀 Deploy to Production
+    runs-on: ubuntu-latest
+    needs: create-assets
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Python ${{ env.PYTHON_VERSION }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+        
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ env.AWS_REGION }}
+        
+    - name: Create Lambda deployment package
+      run: |
+        echo "📦 Creating production Lambda deployment package..."
+        cd lambda
+        pip install -r requirements.txt -t .
+        zip -r ../lambda-production.zip .
+        cd ..
+        
+    - name: Update Lambda function
+      run: |
+        echo "⚡ Updating Lambda function to version ${{ github.event.release.tag_name }}..."
+        aws lambda update-function-code \
+          --function-name ${{ env.LAMBDA_FUNCTION }} \
+          --zip-file fileb://lambda-production.zip \
+          --region ${{ env.AWS_REGION }}
+          
+    - name: Update Lambda configuration
+      run: |
+        echo "⚙️  Updating Lambda configuration..."
+        aws lambda update-function-configuration \
+          --function-name ${{ env.LAMBDA_FUNCTION }} \
+          --environment Variables="{S3_BUCKET=${{ env.S3_BUCKET }},VERSION=${{ github.event.release.tag_name }}}" \
+          --region ${{ env.AWS_REGION }}
+          
+    - name: Update SSM parameter
+      run: |
+        echo "🔑 Updating FRED API key in SSM..."
+        aws ssm put-parameter \
+          --name "/fred-ml/api-key" \
+          --value "${{ secrets.FRED_API_KEY }}" \
+          --type "SecureString" \
+          --overwrite \
+          --region ${{ env.AWS_REGION }}
+          
+    - name: Deploy infrastructure updates
+      run: |
+        echo "🏗️  Deploying infrastructure updates..."
+        aws cloudformation deploy \
+          --template-file infrastructure/s3/bucket.yaml \
+          --stack-name fredmlv1-s3-stack \
+          --parameter-overrides BucketName=${{ env.S3_BUCKET }} \
+          --capabilities CAPABILITY_NAMED_IAM \
+          --region ${{ env.AWS_REGION }}
+          
+        aws cloudformation deploy \
+          --template-file infrastructure/eventbridge/quarterly-rule.yaml \
+          --stack-name fred-ml-processor-eventbridge-stack \
+          --parameter-overrides \
+            LambdaFunctionName=${{ env.LAMBDA_FUNCTION }} \
+            S3BucketName=${{ env.S3_BUCKET }} \
+          --capabilities CAPABILITY_NAMED_IAM \
+          --region ${{ env.AWS_REGION }}
+
+  # Run Production Tests
+  production-tests:
+    name: 🧪 Production Tests
+    runs-on: ubuntu-latest
+    needs: deploy-production
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Python ${{ env.PYTHON_VERSION }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+        
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ env.AWS_REGION }}
+        
+    - name: Run production tests
+      run: |
+        echo "🧪 Running production tests..."
+        python scripts/test_complete_system.py --production
+      env:
+        AWS_DEFAULT_REGION: ${{ env.AWS_REGION }}
+        S3_BUCKET: ${{ env.S3_BUCKET }}
+        LAMBDA_FUNCTION: ${{ env.LAMBDA_FUNCTION }}
+        
+    - name: Generate deployment report
+      run: |
+        echo "📊 Generating deployment report..."
+        echo "Release: ${{ github.event.release.tag_name }}" > deployment-report.txt
+        echo "Deployed at: $(date)" >> deployment-report.txt
+        echo "Lambda function: ${{ env.LAMBDA_FUNCTION }}" >> deployment-report.txt
+        echo "S3 bucket: ${{ env.S3_BUCKET }}" >> deployment-report.txt
+        echo "AWS region: ${{ env.AWS_REGION }}" >> deployment-report.txt
+        
+    - name: Upload deployment report
+      uses: actions/upload-artifact@v3
+      with:
+        name: deployment-report
+        path: deployment-report.txt
+
+  # Notify Stakeholders
+  notify:
+    name: 📢 Notify Stakeholders
+    runs-on: ubuntu-latest
+    needs: [deploy-production, production-tests]
+    if: always()
+    
+    steps:
+    - name: Download deployment report
+      uses: actions/download-artifact@v3
+      with:
+        name: deployment-report
+        
+    - name: Send notification
+      run: |
+        echo "📢 Sending release notification..."
+        if [ "${{ needs.production-tests.result }}" == "success" ]; then
+          echo "✅ Release ${{ github.event.release.tag_name }} deployed successfully!"
+          echo "Production tests passed"
+        else
+          echo "❌ Release ${{ github.event.release.tag_name }} deployment failed!"
+          echo "Production tests failed"
+        fi
+        
+        echo "Release URL: ${{ github.event.release.html_url }}"
+        echo "Release notes: ${{ github.event.release.body }}" 
