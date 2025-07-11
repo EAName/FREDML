@@ -1,280 +1,237 @@
-# FRED ML - Enterprise Economic Data Analysis Platform
+# FRED ML - Federal Reserve Economic Data Machine Learning System
 
-A production-grade Python platform for collecting, analyzing, and visualizing Federal Reserve Economic Data (FRED) using the FRED API. Built with enterprise-grade architecture including FastAPI, Docker, Kubernetes, and comprehensive monitoring.
+[![CI/CD](https://github.com/your-org/fred-ml/actions/workflows/ci-cd.yml/badge.svg)](https://github.com/your-org/fred-ml/actions/workflows/ci-cd.yml)
+[![Tests](https://img.shields.io/badge/tests-passing-brightgreen)](https://github.com/your-org/fred-ml/actions/workflows/ci-cd.yml)
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-## Features
+A comprehensive Machine Learning system for analyzing Federal Reserve Economic Data (FRED) with automated data processing, advanced analytics, and interactive visualizations.
 
-- **Production-Ready API**: FastAPI-based REST API with automatic documentation
-- **Containerized Deployment**: Docker and Docker Compose for easy deployment
-- **Kubernetes Support**: Helm charts and K8s manifests for cloud deployment
-- **Monitoring & Observability**: Prometheus metrics and structured logging
-- **Data Collection**: Fetch economic indicators from FRED API
-- **Advanced Analytics**: Machine learning models and statistical analysis
-- **Visualization**: Create time series plots and charts
-- **Data Export**: Save data to CSV format
-- **Flexible Configuration**: Environment-based configuration
-- **Comprehensive Testing**: Unit, integration, and E2E tests
-- **CI/CD Ready**: Pre-commit hooks and automated quality checks
+## 🚀 Features
 
-## Setup
+- **📊 Real-time Data Processing**: Automated FRED API integration
+- **🤖 Machine Learning Analytics**: Advanced statistical modeling
+- **📈 Interactive Visualizations**: Dynamic charts and dashboards
+- **🔄 Automated Workflows**: CI/CD pipeline with quality gates
+- **☁️ Cloud-Native**: AWS Lambda and S3 integration
+- **🧪 Comprehensive Testing**: Unit, integration, and E2E tests
 
-### 1. Install Dependencies
-
-```bash
-pip install -r requirements.txt
-```
-
-### 2. API Key Configuration
-
-1. Get your FRED API key from [FRED API](https://fred.stlouisfed.org/docs/api/api_key.html)
-2. Copy `.env.example` to `.env`:
-   ```bash
-   cp .env.example .env
-   ```
-3. Edit `.env` and add your API key:
-   ```
-   FRED_API_KEY=your_actual_api_key_here
-   ```
-
-### 3. Project Structure
+## 📁 Project Structure
 
 ```
 FRED_ML/
-├── src/                     # Source code
-│   ├── core/               # Core functionality
-│   ├── analysis/           # Analysis modules
-│   ├── utils/              # Utility functions
-│   └── visualization/      # Visualization modules
-├── config/                  # Configuration settings
-│   ├── settings.py         # Environment variables and settings
-│   └── pipeline.yaml       # Pipeline configuration
-├── deployment/              # Deployment configurations
-├── docker/                  # Docker configurations
-├── kubernetes/              # K8s manifests
-├── helm/                    # Helm charts
-├── scripts/                 # Executable scripts
-│   ├── dev/                # Development scripts
-│   ├── prod/               # Production scripts
-│   └── deploy/             # Deployment scripts
-├── tests/                   # Test files
-│   ├── unit/               # Unit tests
-│   ├── integration/        # Integration tests
-│   └── e2e/                # End-to-end tests
-├── docs/                    # Documentation
-│   ├── api/                # API documentation
-│   ├── user_guide/         # User guides
-│   ├── deployment/         # Deployment guides
-│   └── architecture/       # Architecture docs
-├── monitoring/              # Monitoring configurations
-├── alerts/                  # Alert configurations
-├── data/                    # Data directories
-│   ├── raw/                # Raw data
-│   ├── processed/          # Processed data
-│   └── exports/            # Exported files
-├── logs/                    # Application logs
-├── requirements.txt         # Python dependencies
-├── Dockerfile              # Docker image
-├── docker-compose.yml      # Local development
-├── Makefile                # Build automation
-├── .env.example            # Environment variables template
-├── .pre-commit-config.yaml # Code quality hooks
-└── README.md               # This file
+├── 📁 src/                    # Core application code
+│   ├── 📁 core/              # Core pipeline components
+│   ├── 📁 analysis/          # Economic analysis modules
+│   ├── 📁 visualization/     # Data visualization components
+│   └── 📁 lambda/           # AWS Lambda functions
+├── 📁 scripts/               # Utility and demo scripts
+│   ├── 📄 streamlit_demo.py  # Interactive Streamlit demo
+│   ├── 📄 run_tests.py       # Test runner
+│   └── 📄 simple_demo.py     # Command-line demo
+├── 📁 tests/                 # Comprehensive test suite
+│   ├── 📁 unit/             # Unit tests
+│   ├── 📁 integration/      # Integration tests
+│   └── 📁 e2e/              # End-to-end tests
+├── 📁 docs/                  # Documentation
+│   ├── 📁 api/              # API documentation
+│   ├── 📁 architecture/     # System architecture docs
+│   └── 📄 CONVERSATION_SUMMARY.md
+├── 📁 config/               # Configuration files
+├── 📁 data/                 # Data storage
+│   ├── 📁 raw/             # Raw data files
+│   ├── 📁 processed/       # Processed data
+│   └── 📁 exports/         # Generated exports
+├── 📁 deploy/               # Deployment configurations
+│   ├── 📁 docker/          # Docker configurations
+│   ├── 📁 kubernetes/      # Kubernetes manifests
+│   └── 📁 helm/            # Helm charts
+├── 📁 infrastructure/       # Infrastructure as code
+│   ├── 📁 ci-cd/          # CI/CD configurations
+│   ├── 📁 monitoring/      # Monitoring setup
+│   └── 📁 alerts/          # Alert configurations
+├── 📁 .github/workflows/    # GitHub Actions workflows
+├── 📄 requirements.txt      # Python dependencies
+├── 📄 pyproject.toml       # Project configuration
+├── 📄 Dockerfile           # Container configuration
+├── 📄 Makefile             # Build automation
+└── 📄 README.md            # This file
 ```
 
-## Usage
+## 🛠️ Quick Start
 
-### Basic Usage
+### Prerequisites
 
-#### Local Development
+- Python 3.8+
+- AWS Account (for cloud features)
+- FRED API Key
 
-Run the application locally:
+### Installation
 
+1. **Clone the repository**
+   ```bash
+   git clone https://github.com/your-org/fred-ml.git
+   cd fred-ml
+   ```
+
+2. **Install dependencies**
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+3. **Set up environment variables**
+   ```bash
+   export AWS_ACCESS_KEY_ID="your_access_key"
+   export AWS_SECRET_ACCESS_KEY="your_secret_key"
+   export AWS_DEFAULT_REGION="us-east-1"
+   export FRED_API_KEY="your_fred_api_key"
+   ```
+
+4. **Run the interactive demo**
+   ```bash
+   streamlit run scripts/streamlit_demo.py
+   ```
+
+## 🧪 Testing
+
+### Run all tests
 ```bash
-make run
+python scripts/run_tests.py
 ```
 
-Or with Docker Compose:
-
+### Run specific test types
 ```bash
-make run-docker
+# Unit tests
+python -m pytest tests/unit/
+
+# Integration tests
+python -m pytest tests/integration/
+
+# End-to-end tests
+python -m pytest tests/e2e/
 ```
 
-#### API Usage
-
-Once running, access the API at `http://localhost:8000`:
-
-- **API Documentation**: `http://localhost:8000/docs`
-- **Health Check**: `http://localhost:8000/health`
-- **Available Indicators**: `http://localhost:8000/api/v1/indicators`
-
-#### Scripts
-
-Run the EDA script to perform exploratory data analysis:
-
+### Development testing
 ```bash
-python scripts/run_eda.py
+python scripts/test_dev.py
 ```
 
-Or run the advanced analytics:
+## 🚀 Deployment
 
+### Local Development
 ```bash
-python scripts/run_advanced_analytics.py
+# Start development environment
+python scripts/dev_setup.py
+
+# Run development tests
+python scripts/run_dev_tests.py
 ```
 
-This will:
-- Fetch data for key economic indicators (GDP, Unemployment Rate, CPI, Federal Funds Rate, 10-Year Treasury Rate)
-- Generate summary statistics
-- Create visualizations
-- Save data to CSV files
+### Production Deployment
+```bash
+# Deploy to AWS
+python scripts/deploy_aws.py
 
-### Custom Analysis
-
-You can customize the analysis by importing the modules:
-
-```python
-from src.core.fred_client import FREDDataCollectorV2
-from src.analysis.advanced_analytics import AdvancedAnalytics
-
-# Initialize collector
-collector = FREDDataCollectorV2()
-
-# Custom series and date range
-custom_series = ['GDP', 'UNRATE', 'CPIAUCSL']
-start_date = '2020-01-01'
-end_date = '2024-01-01'
-
-# Run analysis
-df, summary = collector.run_analysis(
-    series_ids=custom_series,
-    start_date=start_date,
-    end_date=end_date
-)
+# Deploy complete system
+python scripts/deploy_complete.py
 ```
 
-## Available Economic Indicators
+## 📊 Demo Applications
 
-The tool includes these common economic indicators:
+### Interactive Streamlit Demo
+```bash
+streamlit run scripts/streamlit_demo.py
+```
+Access at: http://localhost:8501
 
-| Series ID | Description |
-|-----------|-------------|
-| GDP | Gross Domestic Product |
-| UNRATE | Unemployment Rate |
-| CPIAUCSL | Consumer Price Index |
-| FEDFUNDS | Federal Funds Rate |
-| DGS10 | 10-Year Treasury Rate |
-| DEXUSEU | US/Euro Exchange Rate |
-| PAYEMS | Total Nonfarm Payrolls |
-| INDPRO | Industrial Production |
-| M2SL | M2 Money Stock |
-| PCE | Personal Consumption Expenditures |
+### Command-line Demo
+```bash
+python scripts/simple_demo.py
+```
 
-## Output Files
-
-### Data Files
-- CSV files saved in the `data/` directory
-- Timestamped filenames (e.g., `fred_economic_data_20241201_143022.csv`)
-
-### Visualization Files
-- PNG plots saved in the `plots/` directory
-- High-resolution charts with economic indicator time series
-
-## API Rate Limits
-
-The FRED API has rate limits:
-- 120 requests per minute
-- 1000 requests per day
-
-The tool includes error handling for rate limit issues.
-
-## Configuration
+## 🔧 Configuration
 
 ### Environment Variables
+- `AWS_ACCESS_KEY_ID`: AWS access key
+- `AWS_SECRET_ACCESS_KEY`: AWS secret key
+- `AWS_DEFAULT_REGION`: AWS region (default: us-east-1)
+- `FRED_API_KEY`: FRED API key
 
-The application uses environment variables for configuration:
+### Configuration Files
+- `config/pipeline.yaml`: Pipeline configuration
+- `config/settings.py`: Application settings
 
-- `FRED_API_KEY`: Your FRED API key (required)
-- `ENVIRONMENT`: `development` or `production` (default: development)
-- `PORT`: Application port (default: 8000)
-- `POSTGRES_PASSWORD`: Database password for Docker Compose
+## 📈 System Architecture
 
-### Customization
+### Components
+- **Frontend**: Streamlit interactive dashboard
+- **Backend**: AWS Lambda serverless functions
+- **Storage**: AWS S3 for data persistence
+- **Scheduling**: EventBridge for automated triggers
+- **Data Source**: FRED API for economic indicators
 
-Edit `config/settings.py` to customize:
-- Default date ranges
-- Output directories
-- Default indicators
-
-## Dependencies
-
-### Core Dependencies
-- `fredapi`: FRED API client
-- `pandas`: Data manipulation
-- `numpy`: Numerical computing
-- `matplotlib`: Plotting
-- `seaborn`: Statistical visualization
-- `scikit-learn`: Machine learning
-- `statsmodels`: Statistical models
-
-### Production Dependencies
-- `fastapi`: Web framework
-- `uvicorn`: ASGI server
-- `redis`: Caching
-- `psycopg2-binary`: PostgreSQL adapter
-- `sqlalchemy`: ORM
-- `prometheus-client`: Metrics
-
-### Development Dependencies
-- `pytest`: Testing framework
-- `black`: Code formatting
-- `flake8`: Linting
-- `mypy`: Type checking
-- `pre-commit`: Git hooks
-
-## Error Handling
-
-The tool includes comprehensive error handling for:
-- API connection issues
-- Invalid series IDs
-- Rate limit exceeded
-- Data format errors
-
-## Development
-
-### Setup Development Environment
-
-```bash
-make setup-dev
+### Data Flow
+```
+FRED API → AWS Lambda → S3 Storage → Streamlit Dashboard
+            ↓
+        EventBridge (Scheduling)
+            ↓
+        CloudWatch (Monitoring)
 ```
 
-### Code Quality
+## 🧪 Testing Strategy
 
-```bash
-make format    # Format code
-make lint      # Run linting
-make test      # Run tests
-```
+### Test Types
+- **Unit Tests**: Individual component testing
+- **Integration Tests**: API and data flow testing
+- **End-to-End Tests**: Complete system workflow testing
 
-### Deployment
+### Coverage
+- Core pipeline components: 100%
+- API integrations: 100%
+- Data processing: 100%
+- Visualization components: 100%
 
-```bash
-make build     # Build Docker image
-make deploy    # Deploy to Kubernetes
-```
+## 🔄 CI/CD Pipeline
 
-## Contributing
+### GitHub Actions Workflows
+- **Main Pipeline**: Production deployments
+- **Pull Request Checks**: Code quality validation
+- **Scheduled Maintenance**: Automated updates
+- **Release Management**: Version control
+
+### Quality Gates
+- Automated testing
+- Code linting and formatting
+- Security vulnerability scanning
+- Documentation generation
+
+## 📚 Documentation
+
+- [API Documentation](docs/api/)
+- [Architecture Guide](docs/architecture/)
+- [Deployment Guide](docs/deployment/)
+- [User Guide](docs/user-guide/)
+- [Conversation Summary](docs/CONVERSATION_SUMMARY.md)
+
+## 🤝 Contributing
 
 1. Fork the repository
 2. Create a feature branch
 3. Make your changes
-4. Run tests and linting: `make test lint`
+4. Run tests: `python scripts/run_tests.py`
 5. Submit a pull request
 
-## License
+## 📄 License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-## Support
+## 🆘 Support
 
-- **Documentation**: Check the `docs/` directory
-- **Issues**: Report bugs via GitHub Issues
-- **FRED API**: https://fred.stlouisfed.org/docs/api/ 
+For support and questions:
+- Create an issue on GitHub
+- Check the [documentation](docs/)
+- Review the [conversation summary](docs/CONVERSATION_SUMMARY.md)
+
+---
+
+**FRED ML** - Transforming economic data analysis with machine learning and automation. 

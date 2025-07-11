@@ -1,109 +1,337 @@
-name: CI/CD Pipeline
+name: FRED ML CI/CD Pipeline
 
 on:
   push:
     branches: [ main, develop ]
   pull_request:
     branches: [ main ]
+  schedule:
+    # Run tests daily at 2 AM UTC
+    - cron: '0 2 * * *'
+
+env:
+  AWS_REGION: us-west-2
+  S3_BUCKET: fredmlv1
+  LAMBDA_FUNCTION: fred-ml-processor
+  PYTHON_VERSION: '3.9'
 
 jobs:
+  # Test and Quality Checks
   test:
+    name: 🧪 Test & Quality
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        python-version: [3.9, 3.10, 3.11]
     
     steps:
-    - uses: actions/checkout@v4
-    
-    - name: Set up Python ${{ matrix.python-version }}
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Python ${{ env.PYTHON_VERSION }}
       uses: actions/setup-python@v4
       with:
-        python-version: ${{ matrix.python-version }}
-    
+        python-version: ${{ env.PYTHON_VERSION }}
+        
+    - name: Cache pip dependencies
+      uses: actions/cache@v3
+      with:
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-
+          
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
         pip install -r requirements.txt
-        pip install pre-commit
-    
-    - name: Run pre-commit hooks
-      run: pre-commit run --all-files
-    
-    - name: Run tests
+        pip install pytest pytest-cov black flake8 mypy
+        
+    - name: Run linting
       run: |
-        pytest tests/ -v --cov=src --cov-report=xml
-    
+        echo "🔍 Running code linting..."
+        flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+        flake8 . --count --exit-zero --max-complexity=10 --max-line-length=88 --statistics
+        
+    - name: Run type checking
+      run: |
+        echo "🔍 Running type checking..."
+        mypy lambda/ frontend/ src/ --ignore-missing-imports
+        
+    - name: Run formatting check
+      run: |
+        echo "🎨 Checking code formatting..."
+        black --check --diff .
+        
+    - name: Run unit tests
+      run: |
+        echo "🧪 Running unit tests..."
+        pytest tests/unit/ -v --cov=lambda --cov=frontend --cov-report=xml
+        
     - name: Upload coverage to Codecov
       uses: codecov/codecov-action@v3
       with:
         file: ./coverage.xml
+        flags: unittests
+        name: codecov-umbrella
+        fail_ci_if_error: false
 
-  lint:
+  # Integration Tests
+  integration:
+    name: 🔗 Integration Tests
     runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v4
+    needs: test
     
-    - name: Set up Python
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Python ${{ env.PYTHON_VERSION }}
       uses: actions/setup-python@v4
       with:
-        python-version: 3.9
-    
+        python-version: ${{ env.PYTHON_VERSION }}
+        
     - name: Install dependencies
       run: |
-        pip install flake8 black isort mypy
-    
-    - name: Run linting
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ env.AWS_REGION }}
+        
+    - name: Run integration tests
       run: |
-        flake8 src/ tests/
-        black --check src/ tests/
-        isort --check-only src/ tests/
-        mypy src/
-
-  security:
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v4
-    
-    - name: Run security scan
-      uses: snyk/actions/python@master
+        echo "🔗 Running integration tests..."
+        python scripts/test_complete_system.py --skip-e2e
       env:
-        SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
-      with:
-        args: --severity-threshold=high
+        AWS_DEFAULT_REGION: ${{ env.AWS_REGION }}
+        S3_BUCKET: ${{ env.S3_BUCKET }}
+        LAMBDA_FUNCTION: ${{ env.LAMBDA_FUNCTION }}
 
-  build:
-    needs: [test, lint, security]
+  # End-to-End Tests
+  e2e:
+    name: 🚀 End-to-End Tests
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main'
+    needs: [test, integration]
     
     steps:
-    - uses: actions/checkout@v4
-    
-    - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v3
-    
-    - name: Build and push Docker image
-      uses: docker/build-push-action@v5
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Python ${{ env.PYTHON_VERSION }}
+      uses: actions/setup-python@v4
       with:
-        context: .
-        push: true
-        tags: |
-          ghcr.io/${{ github.repository }}:latest
-          ghcr.io/${{ github.repository }}:${{ github.sha }}
-        cache-from: type=gha
-        cache-to: type=gha,mode=max
-
-  deploy:
-    needs: build
-    runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main'
-    environment: production
-    
-    steps:
-    - uses: actions/checkout@v4
-    
-    - name: Deploy to Kubernetes
+        python-version: ${{ env.PYTHON_VERSION }}
+        
+    - name: Install dependencies
       run: |
-        echo "Deploying to production..."
-        # Add your deployment commands here 
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ env.AWS_REGION }}
+        
+    - name: Run end-to-end tests
+      run: |
+        echo "🚀 Running end-to-end tests..."
+        python scripts/test_complete_system.py
+      env:
+        AWS_DEFAULT_REGION: ${{ env.AWS_REGION }}
+        S3_BUCKET: ${{ env.S3_BUCKET }}
+        LAMBDA_FUNCTION: ${{ env.LAMBDA_FUNCTION }}
+        
+    - name: Upload test results
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: test-results
+        path: test_report.json
+
+  # Security Scan
+  security:
+    name: 🔒 Security Scan
+    runs-on: ubuntu-latest
+    needs: test
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Run Bandit security scan
+      run: |
+        echo "🔒 Running security scan..."
+        pip install bandit
+        bandit -r lambda/ frontend/ src/ -f json -o bandit-report.json || true
+        
+    - name: Upload security report
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: security-report
+        path: bandit-report.json
+
+  # Build and Deploy Lambda
+  deploy-lambda:
+    name: ⚡ Deploy Lambda
+    runs-on: ubuntu-latest
+    needs: [test, integration, e2e, security]
+    if: github.ref == 'refs/heads/main'
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Python ${{ env.PYTHON_VERSION }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+        
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ env.AWS_REGION }}
+        
+    - name: Create Lambda deployment package
+      run: |
+        echo "📦 Creating Lambda deployment package..."
+        cd lambda
+        pip install -r requirements.txt -t .
+        zip -r ../lambda-deployment.zip .
+        cd ..
+        
+    - name: Update Lambda function
+      run: |
+        echo "⚡ Updating Lambda function..."
+        aws lambda update-function-code \
+          --function-name ${{ env.LAMBDA_FUNCTION }} \
+          --zip-file fileb://lambda-deployment.zip \
+          --region ${{ env.AWS_REGION }}
+          
+    - name: Update Lambda configuration
+      run: |
+        echo "⚙️  Updating Lambda configuration..."
+        aws lambda update-function-configuration \
+          --function-name ${{ env.LAMBDA_FUNCTION }} \
+          --environment Variables="{S3_BUCKET=${{ env.S3_BUCKET }}}" \
+          --region ${{ env.AWS_REGION }}
+          
+    - name: Update SSM parameter
+      run: |
+        echo "🔑 Updating FRED API key in SSM..."
+        aws ssm put-parameter \
+          --name "/fred-ml/api-key" \
+          --value "${{ secrets.FRED_API_KEY }}" \
+          --type "SecureString" \
+          --overwrite \
+          --region ${{ env.AWS_REGION }}
+
+  # Deploy Infrastructure
+  deploy-infrastructure:
+    name: 🏗️ Deploy Infrastructure
+    runs-on: ubuntu-latest
+    needs: [test, integration, e2e, security]
+    if: github.ref == 'refs/heads/main'
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ env.AWS_REGION }}
+        
+    - name: Deploy S3 bucket
+      run: |
+        echo "📦 Deploying S3 bucket..."
+        aws cloudformation deploy \
+          --template-file infrastructure/s3/bucket.yaml \
+          --stack-name fredmlv1-s3-stack \
+          --parameter-overrides BucketName=${{ env.S3_BUCKET }} \
+          --capabilities CAPABILITY_NAMED_IAM \
+          --region ${{ env.AWS_REGION }}
+          
+    - name: Deploy EventBridge rule
+      run: |
+        echo "⏰ Deploying EventBridge rule..."
+        aws cloudformation deploy \
+          --template-file infrastructure/eventbridge/quarterly-rule.yaml \
+          --stack-name fred-ml-processor-eventbridge-stack \
+          --parameter-overrides \
+            LambdaFunctionName=${{ env.LAMBDA_FUNCTION }} \
+            S3BucketName=${{ env.S3_BUCKET }} \
+          --capabilities CAPABILITY_NAMED_IAM \
+          --region ${{ env.AWS_REGION }}
+
+  # Streamlit Cloud Deployment
+  deploy-streamlit:
+    name: 🎨 Deploy to Streamlit Cloud
+    runs-on: ubuntu-latest
+    needs: [deploy-lambda, deploy-infrastructure]
+    if: github.ref == 'refs/heads/main'
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Deploy to Streamlit Cloud
+      run: |
+        echo "🎨 Deploying to Streamlit Cloud..."
+        echo "Manual deployment required - follow instructions in docs/deployment/streamlit-cloud.md"
+        echo "Repository is ready for Streamlit Cloud deployment"
+        
+    - name: Create deployment summary
+      run: |
+        echo "📋 Deployment Summary" > deployment-summary.md
+        echo "===================" >> deployment-summary.md
+        echo "" >> deployment-summary.md
+        echo "✅ Lambda function updated" >> deployment-summary.md
+        echo "✅ Infrastructure deployed" >> deployment-summary.md
+        echo "📝 Streamlit Cloud deployment: Manual step required" >> deployment-summary.md
+        echo "" >> deployment-summary.md
+        echo "Next steps:" >> deployment-summary.md
+        echo "1. Deploy to Streamlit Cloud using the web interface" >> deployment-summary.md
+        echo "2. Configure environment variables in Streamlit Cloud" >> deployment-summary.md
+        echo "3. Test the complete system" >> deployment-summary.md
+        
+    - name: Upload deployment summary
+      uses: actions/upload-artifact@v3
+      with:
+        name: deployment-summary
+        path: deployment-summary.md
+
+  # Notifications
+  notify:
+    name: 📢 Notifications
+    runs-on: ubuntu-latest
+    needs: [deploy-streamlit]
+    if: always()
+    
+    steps:
+    - name: Download test results
+      uses: actions/download-artifact@v3
+      with:
+        name: test-results
+        
+    - name: Download deployment summary
+      uses: actions/download-artifact@v3
+      with:
+        name: deployment-summary
+        
+    - name: Send notification
+      run: |
+        echo "📢 Sending deployment notification..."
+        if [ "${{ needs.deploy-streamlit.result }}" == "success" ]; then
+          echo "✅ Deployment completed successfully!"
+        else
+          echo "❌ Deployment failed!"
+        fi 

@@ -1,0 +1,137 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'Lambda Function for FRED ML Analysis'
+
+Parameters:
+  FunctionName:
+    Type: String
+    Default: fred-ml-processor
+    Description: Name of the Lambda function
+  
+  S3BucketName:
+    Type: String
+    Default: fredmlv1
+    Description: S3 bucket for storing reports
+  
+  Runtime:
+    Type: String
+    Default: python3.9
+    AllowedValues: [python3.8, python3.9, python3.10, python3.11]
+    Description: Python runtime version
+  
+  Timeout:
+    Type: Number
+    Default: 300
+    Description: Lambda function timeout in seconds
+  
+  MemorySize:
+    Type: Number
+    Default: 512
+    Description: Lambda function memory size in MB
+
+Resources:
+  # Lambda Function
+  FredMLLambdaFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Ref FunctionName
+      Runtime: !Ref Runtime
+      Handler: lambda_function.lambda_handler
+      Code:
+        ZipFile: |
+          import json
+          def lambda_handler(event, context):
+              return {
+                  'statusCode': 200,
+                  'body': json.dumps('Hello from Lambda!')
+              }
+      Timeout: !Ref Timeout
+      MemorySize: !Ref MemorySize
+      Environment:
+        Variables:
+          FRED_API_KEY: !Ref FredAPIKey
+          S3_BUCKET: !Ref S3BucketName
+      Role: !GetAtt LambdaExecutionRole.Arn
+      ReservedConcurrencyLimit: 10
+
+  # IAM Role for Lambda
+  LambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub '${FunctionName}-execution-role'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: FredMLLambdaPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:GetObject
+                  - s3:PutObject
+                  - s3:DeleteObject
+                  - s3:ListBucket
+                Resource:
+                  - !Sub 'arn:aws:s3:::${S3BucketName}'
+                  - !Sub 'arn:aws:s3:::${S3BucketName}/*'
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: '*'
+
+  # CloudWatch Log Group
+  LambdaLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/aws/lambda/${FunctionName}'
+      RetentionInDays: 30
+
+  # SSM Parameter for FRED API Key
+  FredAPIKey:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: !Sub '/fred-ml/api-key'
+      Type: SecureString
+      Value: 'your-fred-api-key-here'  # Replace with actual API key
+      Description: FRED API Key for Lambda function
+
+  # Lambda Function URL (for direct invocation)
+  LambdaFunctionUrl:
+    Type: AWS::Lambda::Url
+    Properties:
+      FunctionName: !Ref FredMLLambdaFunction
+      AuthType: NONE
+      Cors:
+        AllowCredentials: true
+        AllowHeaders: ['*']
+        AllowMethods: ['GET', 'POST']
+        AllowOrigins: ['*']
+        MaxAge: 86400
+
+Outputs:
+  LambdaFunctionArn:
+    Description: ARN of the Lambda function
+    Value: !GetAtt FredMLLambdaFunction.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-LambdaFunctionArn'
+  
+  LambdaFunctionUrl:
+    Description: URL for direct Lambda function invocation
+    Value: !Ref LambdaFunctionUrl
+    Export:
+      Name: !Sub '${AWS::StackName}-LambdaFunctionUrl'
+  
+  LambdaExecutionRoleArn:
+    Description: ARN of the Lambda execution role
+    Value: !GetAtt LambdaExecutionRole.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-LambdaExecutionRoleArn' 
