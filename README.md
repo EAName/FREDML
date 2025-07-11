@@ -1,14 +1,20 @@
-# FRED Economic Data Analysis Tool
+# FRED ML - Enterprise Economic Data Analysis Platform
 
-A comprehensive Python tool for collecting, analyzing, and visualizing Federal Reserve Economic Data (FRED) using the FRED API.
+A production-grade Python platform for collecting, analyzing, and visualizing Federal Reserve Economic Data (FRED) using the FRED API. Built with enterprise-grade architecture including FastAPI, Docker, Kubernetes, and comprehensive monitoring.
 
 ## Features
 
+- **Production-Ready API**: FastAPI-based REST API with automatic documentation
+- **Containerized Deployment**: Docker and Docker Compose for easy deployment
+- **Kubernetes Support**: Helm charts and K8s manifests for cloud deployment
+- **Monitoring & Observability**: Prometheus metrics and structured logging
 - **Data Collection**: Fetch economic indicators from FRED API
-- **Data Analysis**: Generate summary statistics and insights
+- **Advanced Analytics**: Machine learning models and statistical analysis
 - **Visualization**: Create time series plots and charts
 - **Data Export**: Save data to CSV format
-- **Flexible Configuration**: Easy customization of indicators and date ranges
+- **Flexible Configuration**: Environment-based configuration
+- **Comprehensive Testing**: Unit, integration, and E2E tests
+- **CI/CD Ready**: Pre-commit hooks and automated quality checks
 
 ## Setup
 
@@ -34,28 +40,74 @@ pip install -r requirements.txt
 
 ```
 FRED_ML/
-├── config/               # Configuration settings
-│   ├── settings.py       # Environment variables and settings
-│   └── pipeline.yaml     # Pipeline configuration
-├── src/                  # Source code
-│   ├── core/            # Core functionality
-│   ├── analysis/        # Analysis modules
-│   ├── utils/           # Utility functions
-│   └── visualization/   # Visualization modules
-├── scripts/             # Executable scripts
-├── tests/               # Test files
-├── data/                # Data directories
-│   ├── raw/            # Raw data
-│   ├── processed/      # Processed data
-│   └── exports/        # Exported files
-├── requirements.txt     # Python dependencies
-├── .env.example        # Environment variables template
-└── README.md           # This file
+├── src/                     # Source code
+│   ├── core/               # Core functionality
+│   ├── analysis/           # Analysis modules
+│   ├── utils/              # Utility functions
+│   └── visualization/      # Visualization modules
+├── config/                  # Configuration settings
+│   ├── settings.py         # Environment variables and settings
+│   └── pipeline.yaml       # Pipeline configuration
+├── deployment/              # Deployment configurations
+├── docker/                  # Docker configurations
+├── kubernetes/              # K8s manifests
+├── helm/                    # Helm charts
+├── scripts/                 # Executable scripts
+│   ├── dev/                # Development scripts
+│   ├── prod/               # Production scripts
+│   └── deploy/             # Deployment scripts
+├── tests/                   # Test files
+│   ├── unit/               # Unit tests
+│   ├── integration/        # Integration tests
+│   └── e2e/                # End-to-end tests
+├── docs/                    # Documentation
+│   ├── api/                # API documentation
+│   ├── user_guide/         # User guides
+│   ├── deployment/         # Deployment guides
+│   └── architecture/       # Architecture docs
+├── monitoring/              # Monitoring configurations
+├── alerts/                  # Alert configurations
+├── data/                    # Data directories
+│   ├── raw/                # Raw data
+│   ├── processed/          # Processed data
+│   └── exports/            # Exported files
+├── logs/                    # Application logs
+├── requirements.txt         # Python dependencies
+├── Dockerfile              # Docker image
+├── docker-compose.yml      # Local development
+├── Makefile                # Build automation
+├── .env.example            # Environment variables template
+├── .pre-commit-config.yaml # Code quality hooks
+└── README.md               # This file
 ```
 
 ## Usage
 
 ### Basic Usage
+
+#### Local Development
+
+Run the application locally:
+
+```bash
+make run
+```
+
+Or with Docker Compose:
+
+```bash
+make run-docker
+```
+
+#### API Usage
+
+Once running, access the API at `http://localhost:8000`:
+
+- **API Documentation**: `http://localhost:8000/docs`
+- **Health Check**: `http://localhost:8000/health`
+- **Available Indicators**: `http://localhost:8000/api/v1/indicators`
+
+#### Scripts
 
 Run the EDA script to perform exploratory data analysis:
 
@@ -136,21 +188,47 @@ The tool includes error handling for rate limit issues.
 
 ## Configuration
 
+### Environment Variables
+
+The application uses environment variables for configuration:
+
+- `FRED_API_KEY`: Your FRED API key (required)
+- `ENVIRONMENT`: `development` or `production` (default: development)
+- `PORT`: Application port (default: 8000)
+- `POSTGRES_PASSWORD`: Database password for Docker Compose
+
+### Customization
+
 Edit `config/settings.py` to customize:
 - Default date ranges
 - Output directories
 - Default indicators
 
-The API key is now managed through environment variables (see Setup section above).
-
 ## Dependencies
 
+### Core Dependencies
 - `fredapi`: FRED API client
 - `pandas`: Data manipulation
 - `numpy`: Numerical computing
 - `matplotlib`: Plotting
 - `seaborn`: Statistical visualization
-- `jupyter`: Interactive notebooks (optional)
+- `scikit-learn`: Machine learning
+- `statsmodels`: Statistical models
+
+### Production Dependencies
+- `fastapi`: Web framework
+- `uvicorn`: ASGI server
+- `redis`: Caching
+- `psycopg2-binary`: PostgreSQL adapter
+- `sqlalchemy`: ORM
+- `prometheus-client`: Metrics
+
+### Development Dependencies
+- `pytest`: Testing framework
+- `black`: Code formatting
+- `flake8`: Linting
+- `mypy`: Type checking
+- `pre-commit`: Git hooks
 
 ## Error Handling
 
@@ -160,17 +238,43 @@ The tool includes comprehensive error handling for:
 - Rate limit exceeded
 - Data format errors
 
+## Development
+
+### Setup Development Environment
+
+```bash
+make setup-dev
+```
+
+### Code Quality
+
+```bash
+make format    # Format code
+make lint      # Run linting
+make test      # Run tests
+```
+
+### Deployment
+
+```bash
+make build     # Build Docker image
+make deploy    # Deploy to Kubernetes
+```
+
 ## Contributing
 
-To add new features:
-1. Extend the `FREDDataCollector` class
-2. Add new methods for specific analysis
-3. Update the configuration as needed
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Run tests and linting: `make test lint`
+5. Submit a pull request
 
 ## License
 
-This project is for educational and research purposes. Please respect FRED API terms of service.
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
 ## Support
 
-For issues with the FRED API, visit: https://fred.stlouisfed.org/docs/api/ 
+- **Documentation**: Check the `docs/` directory
+- **Issues**: Report bugs via GitHub Issues
+- **FRED API**: https://fred.stlouisfed.org/docs/api/ 

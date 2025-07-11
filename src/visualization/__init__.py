@@ -2,4 +2,4 @@
 Data visualization and plotting utilities.
 """
 
-__all__ = [] 
+__all__ = []
