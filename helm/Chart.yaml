@@ -1,0 +1,17 @@
+apiVersion: v2
+name: fred-ml
+description: A Helm chart for FRED ML Economic Data Analysis
+type: application
+version: 1.0.0
+appVersion: "1.0.0"
+keywords:
+  - economics
+  - data-analysis
+  - machine-learning
+  - fred
+home: https://github.com/EAName/FREDML
+sources:
+  - https://github.com/EAName/FREDML
+maintainers:
+  - name: Edwin Salguero
+    email: edwin@parallel.llc 

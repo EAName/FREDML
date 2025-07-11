@@ -12,10 +12,10 @@ __version__ = "1.0.0"
 __author__ = "Economic Data Team"
 __email__ = "data-team@company.com"
 
-from .core.fred_client import FREDDataCollectorV2
 from .analysis.advanced_analytics import AdvancedAnalytics
+from .core.fred_client import FREDDataCollectorV2
 
 __all__ = [
-    'FREDDataCollectorV2',
-    'AdvancedAnalytics',
-] 
+    "FREDDataCollectorV2",
+    "AdvancedAnalytics",
+]
