@@ -46,13 +46,13 @@ def check_prerequisites():
         print(f"❌ AWS credentials not configured: {e}")
         return False
     
-    # Check AWS CLI
+    # Check AWS CLI (optional)
     try:
         subprocess.run(['aws', '--version'], capture_output=True, check=True)
         print("✅ AWS CLI found")
     except (subprocess.CalledProcessError, FileNotFoundError):
-        print("❌ AWS CLI not found")
-        return False
+        print("⚠️  AWS CLI not found (optional - proceeding without it)")
+        # Don't return False, just warn
     
     print("✅ All prerequisites met")
     return True
