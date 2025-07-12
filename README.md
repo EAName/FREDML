@@ -98,15 +98,6 @@ FRED_ML/
 1. **Clone the repository**
    You can clone from any of the following remotes:
    ```bash
-   # EAName GitHub
-   git clone https://github.com/EAName/FREDML.git
-   
-   # ParallelLLC GitHub
-   git clone https://github.com/ParallelLLC/FREDML.git
-
-   # esalguero Hugging Face
-   git clone https://huggingface.co/esalguero/FREDML
-
    # ParallelLLC Hugging Face
    git clone https://huggingface.co/ParallelLLC/FREDML
    ```
