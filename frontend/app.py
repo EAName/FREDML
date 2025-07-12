@@ -6,19 +6,9 @@ Professional think tank interface for comprehensive economic data analysis
 
 import streamlit as st
 import pandas as pd
-import plotly.express as px
-import plotly.graph_objects as go
-from plotly.subplots import make_subplots
-import boto3
-import json
-from datetime import datetime, timedelta
-import requests
 import os
 import sys
 from typing import Dict, List, Optional
-from pathlib import Path
-
-DEMO_MODE = False
 
 # Page configuration - MUST be first Streamlit command
 st.set_page_config(
@@ -28,55 +18,90 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
+# Lazy imports for better performance
+def get_plotly():
+    """Lazy import plotly to reduce startup time"""
+    import plotly.express as px
+    import plotly.graph_objects as go
+    from plotly.subplots import make_subplots
+    return px, go, make_subplots
+
+def get_boto3():
+    """Lazy import boto3 to reduce startup time"""
+    import boto3
+    return boto3
+
+def get_requests():
+    """Lazy import requests to reduce startup time"""
+    import requests
+    return requests
+
+# Initialize flags
+DEMO_MODE = False
+ANALYTICS_AVAILABLE = False
+FRED_API_AVAILABLE = False
+CONFIG_AVAILABLE = False
+REAL_DATA_MODE = False
+
 # Add src to path for analytics modules
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 
-# Import analytics modules
-try:
-    from src.analysis.comprehensive_analytics import ComprehensiveAnalytics
-    from src.core.enhanced_fred_client import EnhancedFREDClient
-    ANALYTICS_AVAILABLE = True
-except ImportError:
-    ANALYTICS_AVAILABLE = False
+# Lazy import analytics modules
+def load_analytics():
+    """Load analytics modules only when needed"""
+    global ANALYTICS_AVAILABLE
+    try:
+        from src.analysis.comprehensive_analytics import ComprehensiveAnalytics
+        from src.core.enhanced_fred_client import EnhancedFREDClient
+        ANALYTICS_AVAILABLE = True
+        return True
+    except ImportError:
+        ANALYTICS_AVAILABLE = False
+        return False
 
 # Get FRED API key from environment
 FRED_API_KEY = os.getenv('FRED_API_KEY', '')
-CONFIG_IMPORTED = False
 
-# Import real FRED API client
-try:
-    from fred_api_client import get_real_economic_data, generate_real_insights
-    FRED_API_AVAILABLE = True
-except ImportError:
-    FRED_API_AVAILABLE = False
+# Lazy import FRED API client
+def load_fred_client():
+    """Load FRED API client only when needed"""
+    global FRED_API_AVAILABLE
+    try:
+        from fred_api_client import get_real_economic_data, generate_real_insights
+        FRED_API_AVAILABLE = True
+        return True
+    except ImportError:
+        FRED_API_AVAILABLE = False
+        return False
 
-# Import configuration
-try:
-    from config import Config
-    CONFIG_AVAILABLE = True
-except ImportError:
-    CONFIG_AVAILABLE = False
+# Lazy import configuration
+def load_config():
+    """Load configuration only when needed"""
+    global CONFIG_AVAILABLE, FRED_API_KEY, REAL_DATA_MODE
+    try:
+        from config import Config
+        CONFIG_AVAILABLE = True
+        FRED_API_KEY = Config.get_fred_api_key()
+        REAL_DATA_MODE = Config.validate_fred_api_key()
+        return True
+    except ImportError:
+        CONFIG_AVAILABLE = False
+        FRED_API_KEY = os.getenv('FRED_API_KEY')
+        REAL_DATA_MODE = FRED_API_KEY and FRED_API_KEY != 'your-fred-api-key-here'
+        return False
 
-# Check for FRED API key
-if CONFIG_AVAILABLE:
-    FRED_API_KEY = Config.get_fred_api_key()
-    REAL_DATA_MODE = Config.validate_fred_api_key()
-else:
-    FRED_API_KEY = os.getenv('FRED_API_KEY')
-    REAL_DATA_MODE = FRED_API_KEY and FRED_API_KEY != 'your-fred-api-key-here'
-
-if REAL_DATA_MODE:
-    st.info("🎯 Using real FRED API data for live economic insights.")
-else:
-    st.info("📊 Using demo data for demonstration. Get a free FRED API key for real data.")
-    
-    # Fallback to demo data
+# Lazy load demo data
+def load_demo_data():
+    """Load demo data only when needed"""
+    global DEMO_MODE
     try:
         from demo_data import get_demo_data
         DEMO_DATA = get_demo_data()
         DEMO_MODE = True
+        return DEMO_DATA
     except ImportError:
         DEMO_MODE = False
+        return None
 
 # Custom CSS for enterprise styling
 st.markdown("""
@@ -175,6 +200,8 @@ st.markdown("""
 def init_aws_clients():
     """Initialize AWS clients for S3 and Lambda with proper error handling"""
     try:
+        boto3 = get_boto3()
+        
         # Use default AWS configuration
         try:
             # Try default credentials
@@ -199,8 +226,9 @@ def init_aws_clients():
             return None, None
         
         return s3_client, lambda_client
+        
     except Exception as e:
-        # Silently handle AWS credential issues - not critical for demo
+        # AWS not available
         return None, None
 
 # Load configuration
@@ -265,6 +293,8 @@ def trigger_lambda_analysis(lambda_client, function_name: str, payload: Dict) ->
 
 def create_time_series_plot(df: pd.DataFrame, title: str = "Economic Indicators"):
     """Create interactive time series plot"""
+    px, go, make_subplots = get_plotly()
+    
     fig = go.Figure()
     
     colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', '#8c564b']
@@ -297,6 +327,8 @@ def create_time_series_plot(df: pd.DataFrame, title: str = "Economic Indicators"
 
 def create_correlation_heatmap(df: pd.DataFrame):
     """Create correlation heatmap"""
+    px, go, make_subplots = get_plotly()
+    
     corr_matrix = df.corr()
     
     fig = px.imshow(
@@ -319,6 +351,8 @@ def create_correlation_heatmap(df: pd.DataFrame):
 
 def create_forecast_plot(historical_data, forecast_data, title="Forecast"):
     """Create forecast plot with confidence intervals"""
+    px, go, make_subplots = get_plotly()
+    
     fig = go.Figure()
     
     # Historical data
@@ -383,9 +417,24 @@ def create_forecast_plot(historical_data, forecast_data, title="Forecast"):
 def main():
     """Main Streamlit application"""
     
-    # Initialize AWS clients
-    s3_client, lambda_client = init_aws_clients()
-    config = load_config()
+    # Show loading indicator
+    with st.spinner("🚀 Initializing FRED ML Platform..."):
+        # Load configuration
+        load_config()
+        
+        # Initialize AWS clients
+        s3_client, lambda_client = init_aws_clients()
+        config = load_config()
+        
+        # Load demo data if needed
+        if not REAL_DATA_MODE:
+            demo_data = load_demo_data()
+    
+    # Show data mode info
+    if REAL_DATA_MODE:
+        st.success("🎯 Using real FRED API data for live economic insights.")
+    else:
+        st.info("📊 Using demo data for demonstration. Get a free FRED API key for real data.")
     
     # Sidebar
     with st.sidebar:
