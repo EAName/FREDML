@@ -82,32 +82,36 @@ def load_fred_client():
 
 # Lazy import configuration
 def load_config():
-    """Load configuration only when needed"""
+    """
+    Pull in your FRED key (from env or Streamlit secrets),
+    then flip both REAL_DATA_MODE and FRED_API_AVAILABLE.
+    """
     global CONFIG_AVAILABLE, FRED_API_KEY, REAL_DATA_MODE, FRED_API_AVAILABLE
-    
-    # pull from env or secrets
-    fred_key = os.getenv('FRED_API_KEY')
+
+    # 1) Try environment first, then Streamlit secrets
+    fred_key = os.getenv("FRED_API_KEY", "")
     if not fred_key:
         fred_key = st.secrets.get("FRED_API_KEY", "")
-    FRED_API_KEY = fred_key or ''
-    REAL_DATA_MODE = bool(FRED_API_KEY and FRED_API_KEY != 'your-fred-api-key-here')
-    # Now mark the client available whenever we have a valid key
-    FRED_API_AVAILABLE = REAL_DATA_MODE
-    print(f"DEBUG: load_config() - Updated FRED_API_KEY = {FRED_API_KEY}")
-    print(f"DEBUG: load_config() - Updated REAL_DATA_MODE = {REAL_DATA_MODE}")
-    print(f"DEBUG: load_config() - Updated FRED_API_AVAILABLE = {FRED_API_AVAILABLE}")
-    
+    # 2) Normalize
+    FRED_API_KEY = fred_key.strip()
+    # 3) Determine modes
+    REAL_DATA_MODE = bool(FRED_API_KEY and FRED_API_KEY != "your-fred-api-key-here")
+    FRED_API_AVAILABLE = REAL_DATA_MODE  # ensure downstream checks pass
+
+    print(f"DEBUG load_config ▶ FRED_API_KEY={FRED_API_KEY}, REAL_DATA_MODE={REAL_DATA_MODE}, FRED_API_AVAILABLE={FRED_API_AVAILABLE}")
+
+    # 4) Optionally load additional Config class if you have one
     try:
         from config import Config
         CONFIG_AVAILABLE = True
-        if not fred_key:
-            fred_key = Config.get_fred_api_key()
-            FRED_API_KEY = fred_key
-            REAL_DATA_MODE = Config.validate_fred_api_key() if fred_key else False
-        return True
+        if not REAL_DATA_MODE:
+            # fallback to config file
+            cfg_key = Config.get_fred_api_key()
+            if cfg_key:
+                FRED_API_KEY = cfg_key
+                REAL_DATA_MODE = FRED_API_AVAILABLE = True
     except ImportError:
         CONFIG_AVAILABLE = False
-        return False
 
 # Custom CSS for enterprise styling
 st.markdown("""
