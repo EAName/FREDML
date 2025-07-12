@@ -13,9 +13,8 @@ if not fred_key:
     st.error("❌ FRED API not available. Please configure your FRED_API_KEY.")
     st.stop()
 
-# 3. Propagate it into the actual env & secret namespace  
+# 3. Propagate it into the actual env namespace only
 os.environ["FRED_API_KEY"] = fred_key
-st.secrets["FRED_API_KEY"] = fred_key  # so any direct st.secrets lookup also works
 
 # 4. Now hook up your frontend code
 HERE = os.path.dirname(os.path.abspath(__file__))
