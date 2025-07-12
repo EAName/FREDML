@@ -425,6 +425,16 @@ def create_forecast_plot(historical_data, forecast_data, title="Forecast"):
 def main():
     """Main Streamlit application"""
     
+    # Check for FRED API key first
+    fred_key = os.getenv("FRED_API_KEY") or st.secrets.get("FRED_API_KEY")
+    if not fred_key:
+        st.error("❌ FRED API not available. Please configure your FRED API key.")
+        st.info("Get a free FRED API key at: https://fred.stlouisfed.org/docs/api/api_key.html")
+        st.stop()
+    
+    # Add debug print
+    st.write(f"🔑 FRED API Key loaded: {fred_key[:8]}...")
+    
     # Show loading indicator
     with st.spinner("🚀 Initializing FRED ML Platform..."):
         # Load configuration
