@@ -37,7 +37,6 @@ def get_requests():
     return requests
 
 # Initialize flags
-DEMO_MODE = False
 ANALYTICS_AVAILABLE = False
 FRED_API_AVAILABLE = False
 CONFIG_AVAILABLE = False
@@ -89,19 +88,6 @@ def load_config():
         FRED_API_KEY = os.getenv('FRED_API_KEY')
         REAL_DATA_MODE = FRED_API_KEY and FRED_API_KEY != 'your-fred-api-key-here'
         return False
-
-# Lazy load demo data
-def load_demo_data():
-    """Load demo data only when needed"""
-    global DEMO_MODE
-    try:
-        from demo_data import get_demo_data
-        DEMO_DATA = get_demo_data()
-        DEMO_MODE = True
-        return DEMO_DATA
-    except ImportError:
-        DEMO_MODE = False
-        return None
 
 # Custom CSS for enterprise styling
 st.markdown("""
@@ -425,16 +411,14 @@ def main():
         # Initialize AWS clients
         s3_client, lambda_client = init_aws_clients()
         config = load_config()
-        
-        # Load demo data if needed
-        if not REAL_DATA_MODE:
-            demo_data = load_demo_data()
     
     # Show data mode info
     if REAL_DATA_MODE:
         st.success("🎯 Using real FRED API data for live economic insights.")
     else:
-        st.info("📊 Using demo data for demonstration. Get a free FRED API key for real data.")
+        st.error("❌ FRED API key not configured. Please set FRED_API_KEY environment variable.")
+        st.info("Get a free FRED API key at: https://fred.stlouisfed.org/docs/api/api_key.html")
+        return
     
     # Sidebar
     with st.sidebar:
@@ -481,6 +465,7 @@ def show_executive_dashboard(s3_client, config):
     if REAL_DATA_MODE and FRED_API_AVAILABLE:
         # Get real insights from FRED API
         try:
+            load_fred_client()
             insights = generate_real_insights(FRED_API_KEY)
             
             with col1:
@@ -529,97 +514,10 @@ def show_executive_dashboard(s3_client, config):
                 
         except Exception as e:
             st.error(f"Failed to fetch real data: {e}")
-            # Fallback to demo data
-            if DEMO_MODE:
-                insights = DEMO_DATA['insights']
-                # ... demo data display
-            else:
-                # Static fallback
-                pass
-    
-    elif DEMO_MODE:
-        insights = DEMO_DATA['insights']
-        
-        with col1:
-            gdp_insight = insights['GDPC1']
-            st.markdown(f"""
-            <div class="metric-card">
-                <h3>📈 GDP Growth</h3>
-                <h2>{gdp_insight['growth_rate']}</h2>
-                <p>{gdp_insight['current_value']}</p>
-                <small>{gdp_insight['trend']}</small>
-            </div>
-            """, unsafe_allow_html=True)
-        
-        with col2:
-            indpro_insight = insights['INDPRO']
-            st.markdown(f"""
-            <div class="metric-card">
-                <h3>🏭 Industrial Production</h3>
-                <h2>{indpro_insight['growth_rate']}</h2>
-                <p>{indpro_insight['current_value']}</p>
-                <small>{indpro_insight['trend']}</small>
-            </div>
-            """, unsafe_allow_html=True)
-        
-        with col3:
-            cpi_insight = insights['CPIAUCSL']
-            st.markdown(f"""
-            <div class="metric-card">
-                <h3>💰 Inflation Rate</h3>
-                <h2>{cpi_insight['growth_rate']}</h2>
-                <p>{cpi_insight['current_value']}</p>
-                <small>{cpi_insight['trend']}</small>
-            </div>
-            """, unsafe_allow_html=True)
-        
-        with col4:
-            unrate_insight = insights['UNRATE']
-            st.markdown(f"""
-            <div class="metric-card">
-                <h3>💼 Unemployment</h3>
-                <h2>{unrate_insight['current_value']}</h2>
-                <p>{unrate_insight['growth_rate']}</p>
-                <small>{unrate_insight['trend']}</small>
-            </div>
-            """, unsafe_allow_html=True)
+            st.info("Please check your FRED API key configuration.")
     else:
-        # Fallback to static data
-        with col1:
-            st.markdown("""
-            <div class="metric-card">
-                <h3>📈 GDP Growth</h3>
-                <h2>2.1%</h2>
-                <p>Q4 2024</p>
-            </div>
-            """, unsafe_allow_html=True)
-        
-        with col2:
-            st.markdown("""
-            <div class="metric-card">
-                <h3>🏭 Industrial Production</h3>
-                <h2>+0.8%</h2>
-                <p>Monthly Change</p>
-            </div>
-            """, unsafe_allow_html=True)
-        
-        with col3:
-            st.markdown("""
-            <div class="metric-card">
-                <h3>💰 Inflation Rate</h3>
-                <h2>3.2%</h2>
-                <p>Annual Rate</p>
-            </div>
-            """, unsafe_allow_html=True)
-        
-        with col4:
-            st.markdown("""
-            <div class="metric-card">
-                <h3>💼 Unemployment</h3>
-                <h2>3.7%</h2>
-                <p>Current Rate</p>
-            </div>
-            """, unsafe_allow_html=True)
+        st.error("❌ FRED API not available. Please configure your FRED API key.")
+        st.info("Get a free FRED API key at: https://fred.stlouisfed.org/docs/api/api_key.html")
     
     # Recent analysis section
     st.markdown("""
@@ -699,8 +597,10 @@ def show_advanced_analytics_page(s3_client, config):
     </div>
     """, unsafe_allow_html=True)
     
-    if DEMO_MODE:
-        st.info("🎯 Running in demo mode with realistic economic data and insights.")
+    if not REAL_DATA_MODE:
+        st.error("❌ FRED API key not configured. Please set FRED_API_KEY environment variable.")
+        st.info("Get a free FRED API key at: https://fred.stlouisfed.org/docs/api/api_key.html")
+        return
     
     # Analysis configuration
     st.markdown("""
@@ -725,6 +625,7 @@ def show_advanced_analytics_page(s3_client, config):
         )
         
         # Date range
+        from datetime import datetime, timedelta
         end_date = datetime.now()
         start_date = end_date - timedelta(days=365*5)  # 5 years
         
@@ -775,6 +676,9 @@ def show_advanced_analytics_page(s3_client, config):
             # Run real analysis with FRED API data
             with st.spinner(analysis_message):
                 try:
+                    # Load FRED client
+                    load_fred_client()
+                    
                     # Get real economic data
                     real_data = get_real_economic_data(FRED_API_KEY, 
                                                      start_date_input.strftime('%Y-%m-%d'),
@@ -853,17 +757,10 @@ def show_advanced_analytics_page(s3_client, config):
                     
                 except Exception as e:
                     st.error(f"❌ Real data analysis failed: {e}")
-                    st.info("Falling back to demo analysis...")
-                    
-                    # Fallback to demo analysis
-                    if DEMO_MODE:
-                        run_demo_analysis(analysis_type, selected_indicators)
-        
-        elif DEMO_MODE:
-            # Run demo analysis
-            run_demo_analysis(analysis_type, selected_indicators)
+                    st.info("Please check your FRED API key and try again.")
         else:
-            st.error("No data sources available. Please configure FRED API key or use demo mode.")
+            st.error("❌ FRED API not available. Please configure your FRED API key.")
+            st.info("Get a free FRED API key at: https://fred.stlouisfed.org/docs/api/api_key.html")
 
 def generate_analysis_results(analysis_type, real_data, selected_indicators):
     """Generate analysis results based on the selected analysis type"""
@@ -993,121 +890,6 @@ def generate_analysis_results(analysis_type, real_data, selected_indicators):
     
     return {}
 
-def run_demo_analysis(analysis_type, selected_indicators):
-    """Run demo analysis based on selected type"""
-    with st.spinner(f"Running {analysis_type.lower()} analysis with demo data..."):
-        try:
-            # Simulate analysis with demo data
-            import time
-            time.sleep(2)  # Simulate processing time
-            
-            # Generate demo results based on analysis type
-            if analysis_type == "Comprehensive":
-                demo_results = {
-                    'forecasting': {
-                        'GDPC1': {
-                            'backtest': {'mape': 2.1, 'rmse': 0.045},
-                            'forecast': [21847, 22123, 22401, 22682]
-                        },
-                        'INDPRO': {
-                            'backtest': {'mape': 1.8, 'rmse': 0.032},
-                            'forecast': [102.4, 103.1, 103.8, 104.5]
-                        },
-                        'RSAFS': {
-                            'backtest': {'mape': 2.5, 'rmse': 0.078},
-                            'forecast': [579.2, 584.7, 590.3, 595.9]
-                        }
-                    },
-                    'segmentation': {
-                        'time_period_clusters': {'n_clusters': 3},
-                        'series_clusters': {'n_clusters': 4}
-                    },
-                    'statistical_modeling': {
-                        'correlation': {
-                            'significant_correlations': [
-                                'GDPC1-INDPRO: 0.85',
-                                'GDPC1-RSAFS: 0.78',
-                                'CPIAUCSL-FEDFUNDS: 0.65'
-                            ]
-                        }
-                    },
-                    'insights': {
-                        'key_findings': [
-                            'Strong correlation between GDP and Industrial Production (0.85)',
-                            'Inflation showing signs of moderation',
-                            'Federal Reserve policy rate at 22-year high',
-                            'Labor market remains tight with low unemployment',
-                            'Consumer spending resilient despite inflation'
-                        ]
-                    }
-                }
-            elif analysis_type == "Forecasting Only":
-                demo_results = {
-                    'forecasting': {
-                        'GDPC1': {
-                            'backtest': {'mape': 2.1, 'rmse': 0.045},
-                            'forecast': [21847, 22123, 22401, 22682]
-                        },
-                        'INDPRO': {
-                            'backtest': {'mape': 1.8, 'rmse': 0.032},
-                            'forecast': [102.4, 103.1, 103.8, 104.5]
-                        }
-                    },
-                    'insights': {
-                        'key_findings': [
-                            'Forecasting analysis completed successfully',
-                            'Time series models applied to selected indicators',
-                            'Forecast accuracy metrics calculated',
-                            'Confidence intervals generated'
-                        ]
-                    }
-                }
-            elif analysis_type == "Segmentation Only":
-                demo_results = {
-                    'segmentation': {
-                        'time_period_clusters': {'n_clusters': 3},
-                        'series_clusters': {'n_clusters': 4}
-                    },
-                    'insights': {
-                        'key_findings': [
-                            'Segmentation analysis completed successfully',
-                            'Economic regimes identified',
-                            'Series clustering performed',
-                            'Pattern recognition applied'
-                        ]
-                    }
-                }
-            elif analysis_type == "Statistical Only":
-                demo_results = {
-                    'statistical_modeling': {
-                        'correlation': {
-                            'significant_correlations': [
-                                'GDPC1-INDPRO: 0.85',
-                                'GDPC1-RSAFS: 0.78',
-                                'CPIAUCSL-FEDFUNDS: 0.65'
-                            ]
-                        }
-                    },
-                    'insights': {
-                        'key_findings': [
-                            'Statistical analysis completed successfully',
-                            'Correlation analysis performed',
-                            'Significance testing completed',
-                            'Statistical models validated'
-                        ]
-                    }
-                }
-            else:
-                demo_results = {}
-            
-            st.success(f"✅ Demo {analysis_type.lower()} analysis completed successfully!")
-            
-            # Display results
-            display_analysis_results(demo_results)
-            
-        except Exception as e:
-            st.error(f"❌ Demo analysis failed: {e}")
-
 def display_analysis_results(results):
     """Display comprehensive analysis results with download options"""
     st.markdown("""
@@ -1179,6 +961,7 @@ def display_analysis_results(results):
         # Generate downloadable reports
         import json
         import io
+        from datetime import datetime
         
         # Create JSON report
         report_data = {
@@ -1374,81 +1157,33 @@ def show_reports_page(s3_client, config):
     
     # Check if AWS clients are available and test bucket access
     if s3_client is None:
-        st.subheader("Demo Reports & Insights")
-        st.info("📊 Showing demo reports (AWS not configured)")
-        show_demo_reports = True
+        st.error("❌ AWS S3 not configured. Please configure AWS credentials to access reports.")
+        st.info("Reports are stored in AWS S3. Configure your AWS credentials to access them.")
+        return
     else:
         # Test if we can actually access the S3 bucket
         try:
             s3_client.head_bucket(Bucket=config['s3_bucket'])
             st.success(f"✅ Connected to S3 bucket: {config['s3_bucket']}")
-            show_demo_reports = False
         except Exception as e:
-            st.warning(f"⚠️ AWS connected but bucket '{config['s3_bucket']}' not accessible: {str(e)}")
-            st.info("📊 Showing demo reports (S3 bucket not accessible)")
-            show_demo_reports = True
+            st.error(f"❌ Cannot access S3 bucket '{config['s3_bucket']}': {str(e)}")
+            st.info("Please check your AWS credentials and bucket configuration.")
+            return
     
-    # Show demo reports if needed
-    if show_demo_reports:
-        demo_reports = [
-            {
-                'title': 'Economic Outlook Q4 2024',
-                'date': '2024-12-15',
-                'summary': 'Comprehensive analysis of economic indicators and forecasts',
-                'insights': [
-                    'GDP growth expected to moderate to 2.1% in Q4',
-                    'Inflation continuing to moderate from peak levels',
-                    'Federal Reserve likely to maintain current policy stance',
-                    'Labor market remains tight with strong job creation',
-                    'Consumer spending resilient despite inflation pressures'
-                ]
-            },
-            {
-                'title': 'Monetary Policy Analysis',
-                'date': '2024-12-10',
-                'summary': 'Analysis of Federal Reserve policy and market implications',
-                'insights': [
-                    'Federal Funds Rate at 22-year high of 5.25%',
-                    'Yield curve inversion persists, signaling economic uncertainty',
-                    'Inflation expectations well-anchored around 2%',
-                    'Financial conditions tightening as intended',
-                    'Policy normalization expected to begin in 2025'
-                ]
-            },
-            {
-                'title': 'Labor Market Trends',
-                'date': '2024-12-05',
-                'summary': 'Analysis of employment and wage trends',
-                'insights': [
-                    'Unemployment rate at 3.7%, near historic lows',
-                    'Nonfarm payrolls growing at steady pace',
-                    'Wage growth moderating but still above pre-pandemic levels',
-                    'Labor force participation improving gradually',
-                    'Skills mismatch remains a challenge in certain sectors'
-                ]
-            }
-        ]
+    # Try to get real reports from S3
+    reports = get_available_reports(s3_client, config['s3_bucket'])
+    
+    if reports:
+        st.subheader("Available Reports")
         
-        for i, report in enumerate(demo_reports):
-            with st.expander(f"📊 {report['title']} - {report['date']}"):
-                st.markdown(f"**Summary:** {report['summary']}")
-                st.markdown("**Key Insights:**")
-                for insight in report['insights']:
-                    st.markdown(f"• {insight}")
+        for report in reports[:10]:  # Show last 10 reports
+            with st.expander(f"Report: {report['key']} - {report['last_modified'].strftime('%Y-%m-%d %H:%M')}"):
+                report_data = get_report_data(s3_client, config['s3_bucket'], report['key'])
+                if report_data:
+                    st.json(report_data)
     else:
-        # Try to get real reports from S3
-        reports = get_available_reports(s3_client, config['s3_bucket'])
-        
-        if reports:
-            st.subheader("Available Reports")
-            
-            for report in reports[:5]:  # Show last 5 reports
-                with st.expander(f"Report: {report['key']} - {report['last_modified'].strftime('%Y-%m-%d %H:%M')}"):
-                    report_data = get_report_data(s3_client, config['s3_bucket'], report['key'])
-                    if report_data:
-                        st.json(report_data)
-        else:
-            st.info("No reports available. Run an analysis to generate reports.")
+        st.info("No reports available. Run an analysis to generate reports.")
+        st.info("Reports will be automatically generated when you run advanced analytics.")
 
 def show_downloads_page(s3_client, config):
     """Show comprehensive downloads page with reports and visualizations"""
@@ -1458,6 +1193,11 @@ def show_downloads_page(s3_client, config):
         <p>Download Reports, Visualizations & Analysis Data</p>
     </div>
     """, unsafe_allow_html=True)
+    
+    if not REAL_DATA_MODE:
+        st.error("❌ FRED API key not configured. Please set FRED_API_KEY environment variable.")
+        st.info("Get a free FRED API key at: https://fred.stlouisfed.org/docs/api/api_key.html")
+        return
     
     # Create tabs for different download types
     tab1, tab2, tab3, tab4 = st.tabs(["📊 Visualizations", "📄 Reports", "📈 Analysis Data", "📦 Bulk Downloads"])
@@ -1566,154 +1306,114 @@ def show_downloads_page(s3_client, config):
         st.subheader("📄 Analysis Reports")
         st.info("Download comprehensive analysis reports in various formats")
         
-        # Generate sample reports for download
-        import json
-        import io
-        from datetime import datetime
+        if s3_client is None:
+            st.error("❌ AWS S3 not configured. Reports are stored in AWS S3.")
+            st.info("Configure your AWS credentials to access reports.")
+            return
         
-        # Sample analysis report
-        sample_report = {
-            'analysis_timestamp': datetime.now().isoformat(),
-            'summary': {
-                'gdp_growth': '2.1%',
-                'inflation_rate': '3.2%',
-                'unemployment_rate': '3.7%',
-                'industrial_production': '+0.8%'
-            },
-            'key_findings': [
-                'GDP growth remains steady at 2.1%',
-                'Inflation continues to moderate from peak levels',
-                'Labor market remains tight with strong job creation',
-                'Industrial production shows positive momentum'
-            ],
-            'risk_factors': [
-                'Geopolitical tensions affecting supply chains',
-                'Federal Reserve policy uncertainty',
-                'Consumer spending patterns changing'
-            ],
-            'opportunities': [
-                'Strong domestic manufacturing growth',
-                'Technology sector expansion',
-                'Green energy transition investments'
-            ]
-        }
+        # Try to get real reports from S3
+        reports = get_available_reports(s3_client, config['s3_bucket'])
         
-        col1, col2, col3 = st.columns(3)
-        
-        with col1:
-            # JSON Report
-            json_report = json.dumps(sample_report, indent=2)
-            st.download_button(
-                label="📄 Download JSON Report",
-                data=json_report,
-                file_name=f"economic_analysis_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json",
-                mime="application/json"
-            )
-            st.write("Comprehensive analysis data in JSON format")
-        
-        with col2:
-            # CSV Summary
-            csv_data = io.StringIO()
-            csv_data.write("Metric,Value\n")
-            csv_data.write(f"GDP Growth,{sample_report['summary']['gdp_growth']}\n")
-            csv_data.write(f"Inflation Rate,{sample_report['summary']['inflation_rate']}\n")
-            csv_data.write(f"Unemployment Rate,{sample_report['summary']['unemployment_rate']}\n")
-            csv_data.write(f"Industrial Production,{sample_report['summary']['industrial_production']}\n")
+        if reports:
+            st.success(f"✅ Found {len(reports)} reports available for download")
             
-            st.download_button(
-                label="📊 Download CSV Summary",
-                data=csv_data.getvalue(),
-                file_name=f"economic_summary_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
-                mime="text/csv"
-            )
-            st.write("Key metrics in spreadsheet format")
-        
-        with col3:
-            # Text Report
-            text_report = f"""
-ECONOMIC ANALYSIS REPORT
-Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
-
-SUMMARY METRICS:
-- GDP Growth: {sample_report['summary']['gdp_growth']}
-- Inflation Rate: {sample_report['summary']['inflation_rate']}
-- Unemployment Rate: {sample_report['summary']['unemployment_rate']}
-- Industrial Production: {sample_report['summary']['industrial_production']}
-
-KEY FINDINGS:
-{chr(10).join([f"• {finding}" for finding in sample_report['key_findings']])}
-
-RISK FACTORS:
-{chr(10).join([f"• {risk}" for risk in sample_report['risk_factors']])}
-
-OPPORTUNITIES:
-{chr(10).join([f"• {opp}" for opp in sample_report['opportunities']])}
-"""
-            
-            st.download_button(
-                label="📝 Download Text Report",
-                data=text_report,
-                file_name=f"economic_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt",
-                mime="text/plain"
-            )
-            st.write("Human-readable analysis report")
+            for i, report in enumerate(reports[:10]):  # Show last 10 reports
+                col1, col2 = st.columns([3, 1])
+                
+                with col1:
+                    st.write(f"**{report['key']}**")
+                    st.write(f"Size: {report['size']:,} bytes | Modified: {report['last_modified'].strftime('%Y-%m-%d %H:%M')}")
+                
+                with col2:
+                    try:
+                        report_data = get_report_data(s3_client, config['s3_bucket'], report['key'])
+                        if report_data:
+                            import json
+                            json_data = json.dumps(report_data, indent=2)
+                            st.download_button(
+                                label="📥 Download",
+                                data=json_data,
+                                file_name=f"{report['key']}.json",
+                                mime="application/json",
+                                key=f"report_{i}"
+                            )
+                    except Exception as e:
+                        st.error("❌ Download failed")
+        else:
+            st.info("No reports available. Run an analysis to generate reports.")
     
     with tab3:
         st.subheader("📈 Analysis Data")
         st.info("Download raw data and analysis results for further processing")
         
-        # Generate sample data files
+        if not REAL_DATA_MODE:
+            st.error("❌ No real data available. Please configure your FRED API key.")
+            return
+        
+        # Generate real economic data files
         import pandas as pd
         import numpy as np
+        from datetime import datetime, timedelta
         
-        # Sample economic data
-        dates = pd.date_range('2020-01-01', periods=100, freq='D')
-        economic_data = pd.DataFrame({
-            'GDP': np.random.normal(100, 5, 100).cumsum(),
-            'Inflation': np.random.normal(2, 0.5, 100),
-            'Unemployment': np.random.normal(5, 1, 100),
-            'Industrial_Production': np.random.normal(50, 3, 100)
-        }, index=dates)
-        
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            # CSV Data
-            csv_data = economic_data.to_csv()
-            st.download_button(
-                label="📊 Download CSV Data",
-                data=csv_data,
-                file_name=f"economic_data_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
-                mime="text/csv"
-            )
-            st.write("Raw economic time series data")
-        
-        with col2:
-            # Excel Data
-            excel_buffer = io.BytesIO()
-            with pd.ExcelWriter(excel_buffer, engine='openpyxl') as writer:
-                economic_data.to_excel(writer, sheet_name='Economic_Data')
-                # Add summary sheet
-                summary_df = pd.DataFrame({
-                    'Metric': ['Mean', 'Std', 'Min', 'Max'],
-                    'GDP': [economic_data['GDP'].mean(), economic_data['GDP'].std(), economic_data['GDP'].min(), economic_data['GDP'].max()],
-                    'Inflation': [economic_data['Inflation'].mean(), economic_data['Inflation'].std(), economic_data['Inflation'].min(), economic_data['Inflation'].max()],
-                    'Unemployment': [economic_data['Unemployment'].mean(), economic_data['Unemployment'].std(), economic_data['Unemployment'].min(), economic_data['Unemployment'].max()]
-                })
-                summary_df.to_excel(writer, sheet_name='Summary', index=False)
+        try:
+            # Load FRED client and get real data
+            load_fred_client()
+            real_data = get_real_economic_data(FRED_API_KEY, 
+                                             (datetime.now() - timedelta(days=365)).strftime('%Y-%m-%d'),
+                                             datetime.now().strftime('%Y-%m-%d'))
             
-            excel_buffer.seek(0)
-            st.download_button(
-                label="📈 Download Excel Data",
-                data=excel_buffer.getvalue(),
-                file_name=f"economic_analysis_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx",
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-            )
-            st.write("Multi-sheet Excel workbook with data and summary")
+            # Convert to DataFrame
+            if real_data and 'data' in real_data:
+                economic_data = pd.DataFrame(real_data['data'])
+                
+                col1, col2 = st.columns(2)
+                
+                with col1:
+                    # CSV Data
+                    csv_data = economic_data.to_csv()
+                    st.download_button(
+                        label="📊 Download CSV Data",
+                        data=csv_data,
+                        file_name=f"fred_economic_data_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
+                        mime="text/csv"
+                    )
+                    st.write("Raw FRED economic time series data")
+                
+                with col2:
+                    # Excel Data
+                    excel_buffer = io.BytesIO()
+                    with pd.ExcelWriter(excel_buffer, engine='openpyxl') as writer:
+                        economic_data.to_excel(writer, sheet_name='Economic_Data')
+                        # Add summary sheet
+                        summary_df = pd.DataFrame({
+                            'Metric': ['Mean', 'Std', 'Min', 'Max'],
+                            'Value': [economic_data.mean().mean(), economic_data.std().mean(), economic_data.min().min(), economic_data.max().max()]
+                        })
+                        summary_df.to_excel(writer, sheet_name='Summary', index=False)
+                    
+                    excel_buffer.seek(0)
+                    st.download_button(
+                        label="📈 Download Excel Data",
+                        data=excel_buffer.getvalue(),
+                        file_name=f"fred_economic_analysis_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx",
+                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                    )
+                    st.write("Multi-sheet Excel workbook with FRED data and summary")
+            else:
+                st.error("❌ Could not retrieve real economic data.")
+                st.info("Please check your FRED API key and try again.")
+                
+        except Exception as e:
+            st.error(f"❌ Failed to generate data files: {e}")
+            st.info("Please check your FRED API key and try again.")
     
     with tab4:
         st.subheader("📦 Bulk Downloads")
         st.info("Download all available files in one package")
+        
+        if not REAL_DATA_MODE:
+            st.error("❌ No real data available for bulk download.")
+            return
         
         # Create a zip file with all available data
         import zipfile
@@ -1723,15 +1423,31 @@ OPPORTUNITIES:
         zip_buffer = io.BytesIO()
         
         with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
-            # Add sample reports
-            zip_file.writestr('reports/economic_analysis.json', json.dumps(sample_report, indent=2))
-            zip_file.writestr('reports/economic_summary.csv', csv_data)
-            zip_file.writestr('reports/economic_report.txt', text_report)
+            # Add real reports if available
+            if s3_client:
+                reports = get_available_reports(s3_client, config['s3_bucket'])
+                for i, report in enumerate(reports[:5]):  # Add first 5 reports
+                    try:
+                        report_data = get_report_data(s3_client, config['s3_bucket'], report['key'])
+                        if report_data:
+                            import json
+                            zip_file.writestr(f'reports/{report["key"]}.json', json.dumps(report_data, indent=2))
+                    except Exception:
+                        continue
             
-            # Add sample data
-            zip_file.writestr('data/economic_data.csv', economic_data.to_csv())
+            # Add real data if available
+            try:
+                load_fred_client()
+                real_data = get_real_economic_data(FRED_API_KEY, 
+                                                 (datetime.now() - timedelta(days=365)).strftime('%Y-%m-%d'),
+                                                 datetime.now().strftime('%Y-%m-%d'))
+                if real_data and 'data' in real_data:
+                    economic_data = pd.DataFrame(real_data['data'])
+                    zip_file.writestr('data/fred_economic_data.csv', economic_data.to_csv())
+            except Exception:
+                pass
             
-            # Add sample visualizations (if available)
+            # Add visualizations if available
             try:
                 charts = chart_gen.list_available_charts()
                 for i, chart in enumerate(charts[:5]):  # Add first 5 charts
@@ -1786,8 +1502,8 @@ def show_configuration_page(config):
         st.success("✅ FRED API Key Configured")
         st.info("🎯 Real economic data is being used for analysis.")
     else:
-        st.warning("⚠️ FRED API Key Not Configured")
-        st.info("📊 Demo data is being used for demonstration.")
+        st.error("❌ FRED API Key Not Configured")
+        st.info("📊 Please configure your FRED API key to access real economic data.")
         
         # Setup instructions
         with st.expander("🔧 How to Set Up FRED API"):
@@ -1828,7 +1544,7 @@ def show_configuration_page(config):
         st.write(f"API Endpoint: {config['api_endpoint']}")
         st.write(f"Analytics Available: {ANALYTICS_AVAILABLE}")
         st.write(f"Real Data Mode: {REAL_DATA_MODE}")
-        st.write(f"Demo Mode: {DEMO_MODE}")
+        st.write(f"FRED API Available: {FRED_API_AVAILABLE}")
     
     # Data Source Information
     st.subheader("Data Sources")
