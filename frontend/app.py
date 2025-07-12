@@ -89,10 +89,13 @@ def load_config():
     
     # Try multiple sources for FRED API key
     fred_key = os.getenv('FRED_API_KEY')
+    print(f"DEBUG: load_config() - FRED_API_KEY from os.getenv = {fred_key}")
     if not fred_key:
         try:
             fred_key = st.secrets.get("FRED_API_KEY")
-        except:
+            print(f"DEBUG: load_config() - FRED_API_KEY from st.secrets = {fred_key}")
+        except Exception as e:
+            print(f"DEBUG: load_config() - Error getting from st.secrets: {e}")
             pass
     
     print("DEBUG: Final FRED_API_KEY =", fred_key)
@@ -100,6 +103,8 @@ def load_config():
     # Update global variables
     FRED_API_KEY = fred_key or ''
     REAL_DATA_MODE = FRED_API_KEY and FRED_API_KEY != 'your-fred-api-key-here'
+    print(f"DEBUG: load_config() - Updated FRED_API_KEY = {FRED_API_KEY}")
+    print(f"DEBUG: load_config() - Updated REAL_DATA_MODE = {REAL_DATA_MODE}")
     
     try:
         from config import Config

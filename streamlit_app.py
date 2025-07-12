@@ -9,8 +9,13 @@ load_dotenv()
 
 # 2. Grab the key from env OR Cloud secrets
 fred_key = os.getenv("FRED_API_KEY") or st.secrets.get("FRED_API_KEY")
+print(f"DEBUG: FRED_API_KEY from os.getenv = {os.getenv('FRED_API_KEY')}")
+print(f"DEBUG: FRED_API_KEY from st.secrets = {st.secrets.get('FRED_API_KEY')}")
+print(f"DEBUG: Final fred_key = {fred_key}")
 if not fred_key:
     st.error("❌ FRED API not available. Please configure your FRED_API_KEY.")
+    st.info("Available environment variables: " + str(list(os.environ.keys())))
+    st.info("Available secrets keys: " + str(list(st.secrets.keys())))
     st.stop()
 
 # 3. Propagate it into the actual env namespace only
