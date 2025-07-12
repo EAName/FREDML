@@ -14,7 +14,7 @@ def generate_economic_data():
     # Generate date range (last 5 years)
     end_date = datetime.now()
     start_date = end_date - timedelta(days=365*5)
-    dates = pd.date_range(start=start_date, end=end_date, freq='M')
+    dates = pd.date_range(start=start_date, end=end_date, freq='ME')
     
     # Base values and trends for realistic economic data
     base_values = {
@@ -197,7 +197,7 @@ def generate_forecast_data():
     
     # Generate future dates (next 4 quarters)
     last_date = datetime.now()
-    future_dates = pd.date_range(start=last_date + timedelta(days=90), periods=4, freq='Q')
+    future_dates = pd.date_range(start=last_date + timedelta(days=90), periods=4, freq='QE')
     
     forecasts = {}
     
