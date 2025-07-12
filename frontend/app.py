@@ -85,24 +85,14 @@ def load_config():
     """Load configuration only when needed"""
     global CONFIG_AVAILABLE, FRED_API_KEY, REAL_DATA_MODE, FRED_API_AVAILABLE
     
-    # Try multiple sources for FRED API key
+    # pull from env or secrets
     fred_key = os.getenv('FRED_API_KEY')
-    print(f"DEBUG: load_config() - FRED_API_KEY from os.getenv = {fred_key}")
     if not fred_key:
-        try:
-            fred_key = st.secrets["FRED_API_KEY"]
-            print(f"DEBUG: load_config() - FRED_API_KEY from st.secrets = {fred_key}")
-        except Exception as e:
-            print(f"DEBUG: load_config() - Error getting from st.secrets: {e}")
-            pass
-    
-    print("DEBUG: Final FRED_API_KEY =", fred_key)
-    
-    # Update global variables
+        fred_key = st.secrets.get("FRED_API_KEY", "")
     FRED_API_KEY = fred_key or ''
-    REAL_DATA_MODE = FRED_API_KEY and FRED_API_KEY != 'your-fred-api-key-here'
-    # Now that we know the key exists, mark the API client as available
-    FRED_API_AVAILABLE = bool(REAL_DATA_MODE)
+    REAL_DATA_MODE = bool(FRED_API_KEY and FRED_API_KEY != 'your-fred-api-key-here')
+    # Now mark the client available whenever we have a valid key
+    FRED_API_AVAILABLE = REAL_DATA_MODE
     print(f"DEBUG: load_config() - Updated FRED_API_KEY = {FRED_API_KEY}")
     print(f"DEBUG: load_config() - Updated REAL_DATA_MODE = {REAL_DATA_MODE}")
     print(f"DEBUG: load_config() - Updated FRED_API_AVAILABLE = {FRED_API_AVAILABLE}")
