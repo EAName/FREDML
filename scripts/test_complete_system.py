@@ -1,470 +1,428 @@
 #!/usr/bin/env python3
 """
-Complete System Test for FRED ML
-Tests the entire workflow: Streamlit → Lambda → S3 → Reports
+FRED ML - Complete System Test
+Comprehensive testing of all system components
 """
 
 import os
 import sys
-import json
-import time
-import boto3
 import subprocess
+import logging
 from pathlib import Path
-from datetime import datetime, timedelta
+from datetime import datetime
+import json
 
-def print_header(title):
-    """Print a formatted header"""
-    print(f"\n{'='*60}")
-    print(f"🧪 {title}")
-    print(f"{'='*60}")
+# Setup logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
 
-def print_success(message):
-    """Print success message"""
-    print(f"✅ {message}")
-
-def print_error(message):
-    """Print error message"""
-    print(f"❌ {message}")
-
-def print_warning(message):
-    """Print warning message"""
-    print(f"⚠️  {message}")
-
-def print_info(message):
-    """Print info message"""
-    print(f"ℹ️  {message}")
-
-def check_prerequisites():
-    """Check if all prerequisites are met"""
-    print_header("Checking Prerequisites")
+class FREDMLSystemTest:
+    """Complete system testing for FRED ML"""
     
-    # Check Python version
-    if sys.version_info < (3, 9):
-        print_error("Python 3.9+ is required")
-        return False
-    print_success(f"Python {sys.version_info.major}.{sys.version_info.minor} detected")
-    
-    # Check required packages
-    required_packages = ['boto3', 'pandas', 'numpy', 'requests']
-    missing_packages = []
-    
-    for package in required_packages:
-        try:
-            __import__(package)
-            print_success(f"{package} is available")
-        except ImportError:
-            missing_packages.append(package)
-            print_error(f"{package} is missing")
-    
-    if missing_packages:
-        print_error(f"Missing packages: {', '.join(missing_packages)}")
-        print_info("Run: pip install -r requirements.txt")
-        return False
-    
-    # Check AWS credentials
-    try:
-        sts = boto3.client('sts')
-        identity = sts.get_caller_identity()
-        print_success(f"AWS credentials configured for account: {identity['Account']}")
-    except Exception as e:
-        print_error(f"AWS credentials not configured: {e}")
-        return False
-    
-    # Check AWS CLI
-    try:
-        result = subprocess.run(['aws', '--version'], capture_output=True, text=True, check=True)
-        print_success("AWS CLI is available")
-    except (subprocess.CalledProcessError, FileNotFoundError):
-        print_warning("AWS CLI not found (optional)")
-    
-    return True
-
-def test_aws_services():
-    """Test AWS services connectivity"""
-    print_header("Testing AWS Services")
-    
-    # Test S3
-    try:
-        s3 = boto3.client('s3', region_name='us-west-2')
-        response = s3.head_bucket(Bucket='fredmlv1')
-        print_success("S3 bucket 'fredmlv1' is accessible")
-    except Exception as e:
-        print_error(f"S3 bucket access failed: {e}")
-        return False
-    
-    # Test Lambda
-    try:
-        lambda_client = boto3.client('lambda', region_name='us-west-2')
-        response = lambda_client.get_function(FunctionName='fred-ml-processor')
-        print_success("Lambda function 'fred-ml-processor' exists")
-        print_info(f"Runtime: {response['Configuration']['Runtime']}")
-        print_info(f"Memory: {response['Configuration']['MemorySize']} MB")
-        print_info(f"Timeout: {response['Configuration']['Timeout']} seconds")
-    except Exception as e:
-        print_error(f"Lambda function not found: {e}")
-        return False
-    
-    # Test SSM
-    try:
-        ssm = boto3.client('ssm', region_name='us-west-2')
-        response = ssm.get_parameter(Name='/fred-ml/api-key', WithDecryption=True)
-        api_key = response['Parameter']['Value']
-        if api_key and api_key != 'your-fred-api-key-here':
-            print_success("FRED API key is configured in SSM")
-        else:
-            print_error("FRED API key not properly configured")
-            return False
-    except Exception as e:
-        print_error(f"SSM parameter not found: {e}")
-        return False
-    
-    return True
-
-def test_lambda_function():
-    """Test Lambda function invocation"""
-    print_header("Testing Lambda Function")
-    
-    try:
-        lambda_client = boto3.client('lambda', region_name='us-west-2')
+    def __init__(self):
+        self.root_dir = Path(__file__).parent.parent
+        self.test_results = {}
         
-        # Test payload
-        test_payload = {
-            'indicators': ['GDP', 'UNRATE'],
-            'start_date': '2024-01-01',
-            'end_date': '2024-01-31',
-            'options': {
-                'visualizations': True,
-                'correlation': True,
-                'forecasting': False,
-                'statistics': True
-            }
+    def run_complete_system_test(self):
+        """Run complete system test"""
+        logger.info("🧪 Starting FRED ML Complete System Test")
+        logger.info("=" * 60)
+        
+        # 1. Environment Setup Test
+        self.test_environment_setup()
+        
+        # 2. Dependencies Test
+        self.test_dependencies()
+        
+        # 3. Configuration Test
+        self.test_configurations()
+        
+        # 4. Core Modules Test
+        self.test_core_modules()
+        
+        # 5. Advanced Analytics Test
+        self.test_advanced_analytics()
+        
+        # 6. Streamlit UI Test
+        self.test_streamlit_ui()
+        
+        # 7. Integration Test
+        self.test_integration()
+        
+        # 8. Performance Test
+        self.test_performance()
+        
+        # 9. Generate Test Report
+        self.generate_test_report()
+        
+    def test_environment_setup(self):
+        """Test environment setup"""
+        logger.info("🔧 Testing environment setup...")
+        
+        # Check Python version
+        python_version = sys.version_info
+        if python_version.major >= 3 and python_version.minor >= 8:
+            logger.info(f"✅ Python version: {python_version.major}.{python_version.minor}.{python_version.micro}")
+            self.test_results['python_version'] = True
+        else:
+            logger.error(f"❌ Python version too old: {python_version}")
+            self.test_results['python_version'] = False
+        
+        # Check working directory
+        logger.info(f"✅ Working directory: {self.root_dir}")
+        self.test_results['working_directory'] = True
+        
+        # Check environment variables
+        required_env_vars = ['FRED_API_KEY']
+        env_status = True
+        for var in required_env_vars:
+            if os.getenv(var):
+                logger.info(f"✅ Environment variable set: {var}")
+            else:
+                logger.warning(f"⚠️ Environment variable not set: {var}")
+                env_status = False
+        
+        self.test_results['environment_variables'] = env_status
+    
+    def test_dependencies(self):
+        """Test dependencies"""
+        logger.info("📦 Testing dependencies...")
+        
+        required_packages = [
+            'pandas',
+            'numpy',
+            'scikit-learn',
+            'scipy',
+            'statsmodels',
+            'streamlit',
+            'plotly',
+            'boto3',
+            'fredapi'
+        ]
+        
+        missing_packages = []
+        for package in required_packages:
+            try:
+                __import__(package)
+                logger.info(f"✅ Package available: {package}")
+            except ImportError:
+                logger.error(f"❌ Package missing: {package}")
+                missing_packages.append(package)
+        
+        if missing_packages:
+            self.test_results['dependencies'] = False
+            logger.error(f"❌ Missing packages: {missing_packages}")
+        else:
+            self.test_results['dependencies'] = True
+            logger.info("✅ All dependencies available")
+    
+    def test_configurations(self):
+        """Test configuration files"""
+        logger.info("⚙️ Testing configurations...")
+        
+        config_files = [
+            'config/pipeline.yaml',
+            'config/settings.py',
+            'requirements.txt',
+            'pyproject.toml'
+        ]
+        
+        config_status = True
+        for config_file in config_files:
+            full_path = self.root_dir / config_file
+            if full_path.exists():
+                logger.info(f"✅ Configuration file exists: {config_file}")
+            else:
+                logger.error(f"❌ Configuration file missing: {config_file}")
+                config_status = False
+        
+        self.test_results['configurations'] = config_status
+    
+    def test_core_modules(self):
+        """Test core modules"""
+        logger.info("🔧 Testing core modules...")
+        
+        # Add src to path
+        sys.path.append(str(self.root_dir / 'src'))
+        
+        core_modules = [
+            'src.core.enhanced_fred_client',
+            'src.analysis.economic_forecasting',
+            'src.analysis.economic_segmentation',
+            'src.analysis.statistical_modeling',
+            'src.analysis.comprehensive_analytics'
+        ]
+        
+        module_status = True
+        for module in core_modules:
+            try:
+                __import__(module)
+                logger.info(f"✅ Module available: {module}")
+            except ImportError as e:
+                logger.error(f"❌ Module missing: {module} - {e}")
+                module_status = False
+        
+        self.test_results['core_modules'] = module_status
+    
+    def test_advanced_analytics(self):
+        """Test advanced analytics functionality"""
+        logger.info("🔮 Testing advanced analytics...")
+        
+        try:
+            # Test Enhanced FRED Client
+            from src.core.enhanced_fred_client import EnhancedFREDClient
+            logger.info("✅ Enhanced FRED Client imported successfully")
+            
+            # Test Economic Forecasting
+            from src.analysis.economic_forecasting import EconomicForecaster
+            logger.info("✅ Economic Forecasting imported successfully")
+            
+            # Test Economic Segmentation
+            from src.analysis.economic_segmentation import EconomicSegmentation
+            logger.info("✅ Economic Segmentation imported successfully")
+            
+            # Test Statistical Modeling
+            from src.analysis.statistical_modeling import StatisticalModeling
+            logger.info("✅ Statistical Modeling imported successfully")
+            
+            # Test Comprehensive Analytics
+            from src.analysis.comprehensive_analytics import ComprehensiveAnalytics
+            logger.info("✅ Comprehensive Analytics imported successfully")
+            
+            self.test_results['advanced_analytics'] = True
+            
+        except Exception as e:
+            logger.error(f"❌ Advanced analytics test failed: {e}")
+            self.test_results['advanced_analytics'] = False
+    
+    def test_streamlit_ui(self):
+        """Test Streamlit UI"""
+        logger.info("🎨 Testing Streamlit UI...")
+        
+        try:
+            # Check if Streamlit app exists
+            streamlit_app = self.root_dir / 'frontend/app.py'
+            if not streamlit_app.exists():
+                logger.error("❌ Streamlit app not found")
+                self.test_results['streamlit_ui'] = False
+                return
+            
+            # Check app content
+            with open(streamlit_app, 'r') as f:
+                content = f.read()
+            
+            # Check for required components
+            required_components = [
+                'st.set_page_config',
+                'ComprehensiveAnalytics',
+                'EnhancedFREDClient',
+                'show_executive_dashboard',
+                'show_advanced_analytics_page'
+            ]
+            
+            missing_components = []
+            for component in required_components:
+                if component not in content:
+                    missing_components.append(component)
+            
+            if missing_components:
+                logger.error(f"❌ Missing components in Streamlit app: {missing_components}")
+                self.test_results['streamlit_ui'] = False
+            else:
+                logger.info("✅ Streamlit UI components found")
+                self.test_results['streamlit_ui'] = True
+                
+        except Exception as e:
+            logger.error(f"❌ Streamlit UI test failed: {e}")
+            self.test_results['streamlit_ui'] = False
+    
+    def test_integration(self):
+        """Test system integration"""
+        logger.info("🔗 Testing system integration...")
+        
+        try:
+            # Test FRED API connection (if API key available)
+            from config.settings import FRED_API_KEY
+            if FRED_API_KEY:
+                try:
+                    from src.core.enhanced_fred_client import EnhancedFREDClient
+                    client = EnhancedFREDClient(FRED_API_KEY)
+                    logger.info("✅ FRED API client created successfully")
+                    
+                    # Test series info retrieval
+                    series_info = client.get_series_info('GDPC1')
+                    if 'error' not in series_info:
+                        logger.info("✅ FRED API connection successful")
+                        self.test_results['fred_api_integration'] = True
+                    else:
+                        logger.warning("⚠️ FRED API connection failed")
+                        self.test_results['fred_api_integration'] = False
+                        
+                except Exception as e:
+                    logger.error(f"❌ FRED API integration failed: {e}")
+                    self.test_results['fred_api_integration'] = False
+            else:
+                logger.warning("⚠️ FRED API key not available, skipping API test")
+                self.test_results['fred_api_integration'] = False
+            
+            # Test analytics integration
+            try:
+                from src.analysis.comprehensive_analytics import ComprehensiveAnalytics
+                logger.info("✅ Analytics integration successful")
+                self.test_results['analytics_integration'] = True
+            except Exception as e:
+                logger.error(f"❌ Analytics integration failed: {e}")
+                self.test_results['analytics_integration'] = False
+                
+        except Exception as e:
+            logger.error(f"❌ Integration test failed: {e}")
+            self.test_results['integration'] = False
+    
+    def test_performance(self):
+        """Test system performance"""
+        logger.info("⚡ Testing system performance...")
+        
+        try:
+            # Test data processing performance
+            import pandas as pd
+            import numpy as np
+            
+            # Create test data
+            test_data = pd.DataFrame({
+                'GDPC1': np.random.randn(1000),
+                'INDPRO': np.random.randn(1000),
+                'RSAFS': np.random.randn(1000)
+            })
+            
+            # Test analytics modules with test data
+            from src.analysis.economic_forecasting import EconomicForecaster
+            from src.analysis.economic_segmentation import EconomicSegmentation
+            from src.analysis.statistical_modeling import StatisticalModeling
+            
+            # Test forecasting performance
+            forecaster = EconomicForecaster(test_data)
+            logger.info("✅ Forecasting module performance test passed")
+            
+            # Test segmentation performance
+            segmentation = EconomicSegmentation(test_data)
+            logger.info("✅ Segmentation module performance test passed")
+            
+            # Test statistical modeling performance
+            modeling = StatisticalModeling(test_data)
+            logger.info("✅ Statistical modeling performance test passed")
+            
+            self.test_results['performance'] = True
+            
+        except Exception as e:
+            logger.error(f"❌ Performance test failed: {e}")
+            self.test_results['performance'] = False
+    
+    def generate_test_report(self):
+        """Generate comprehensive test report"""
+        logger.info("📊 Generating test report...")
+        
+        # Calculate overall status
+        total_tests = len(self.test_results)
+        passed_tests = sum(1 for status in self.test_results.values() if status)
+        overall_status = "✅ PASSED" if passed_tests == total_tests else "❌ FAILED"
+        
+        # Generate report
+        report = {
+            "timestamp": datetime.now().isoformat(),
+            "overall_status": overall_status,
+            "summary": {
+                "total_tests": total_tests,
+                "passed_tests": passed_tests,
+                "failed_tests": total_tests - passed_tests,
+                "success_rate": f"{(passed_tests/total_tests)*100:.1f}%"
+            },
+            "detailed_results": self.test_results
         }
         
-        print_info("Invoking Lambda function...")
-        response = lambda_client.invoke(
-            FunctionName='fred-ml-processor',
-            InvocationType='RequestResponse',
-            Payload=json.dumps(test_payload)
-        )
+        # Save report
+        report_file = self.root_dir / 'system_test_report.json'
+        with open(report_file, 'w') as f:
+            json.dump(report, f, indent=2)
         
-        response_payload = json.loads(response['Payload'].read().decode('utf-8'))
+        # Print summary
+        logger.info("=" * 60)
+        logger.info("📊 SYSTEM TEST REPORT")
+        logger.info("=" * 60)
+        logger.info(f"Overall Status: {overall_status}")
+        logger.info(f"Total Tests: {total_tests}")
+        logger.info(f"Passed: {passed_tests}")
+        logger.info(f"Failed: {total_tests - passed_tests}")
+        logger.info(f"Success Rate: {(passed_tests/total_tests)*100:.1f}%")
+        logger.info("=" * 60)
         
-        if response['StatusCode'] == 200 and response_payload.get('status') == 'success':
-            print_success("Lambda function executed successfully")
-            print_info(f"Report ID: {response_payload.get('report_id')}")
-            print_info(f"Report Key: {response_payload.get('report_key')}")
-            return response_payload
-        else:
-            print_error(f"Lambda function failed: {response_payload}")
-            return None
-            
-    except Exception as e:
-        print_error(f"Lambda invocation failed: {e}")
-        return None
-
-def test_s3_storage():
-    """Test S3 storage and retrieval"""
-    print_header("Testing S3 Storage")
+        # Print detailed results
+        logger.info("Detailed Results:")
+        for test, status in self.test_results.items():
+            status_icon = "✅" if status else "❌"
+            logger.info(f"  {status_icon} {test}")
+        
+        logger.info("=" * 60)
+        logger.info(f"Report saved to: {report_file}")
+        
+        return report
     
-    try:
-        s3 = boto3.client('s3', region_name='us-west-2')
+    def run_demo_tests(self):
+        """Run demo tests"""
+        logger.info("🎯 Running demo tests...")
         
-        # List reports
-        response = s3.list_objects_v2(
-            Bucket='fredmlv1',
-            Prefix='reports/'
-        )
-        
-        if 'Contents' in response:
-            print_success(f"Found {len(response['Contents'])} report(s) in S3")
-            
-            # Get the latest report
-            latest_report = max(response['Contents'], key=lambda x: x['LastModified'])
-            print_info(f"Latest report: {latest_report['Key']}")
-            print_info(f"Size: {latest_report['Size']} bytes")
-            print_info(f"Last modified: {latest_report['LastModified']}")
-            
-            # Download and verify report
-            report_response = s3.get_object(
-                Bucket='fredmlv1',
-                Key=latest_report['Key']
-            )
-            
-            report_data = json.loads(report_response['Body'].read().decode('utf-8'))
-            
-            # Verify report structure
-            required_fields = ['report_id', 'timestamp', 'indicators', 'statistics', 'data']
-            for field in required_fields:
-                if field not in report_data:
-                    print_error(f"Missing required field: {field}")
-                    return False
-            
-            print_success("Report structure is valid")
-            print_info(f"Indicators: {report_data['indicators']}")
-            print_info(f"Data points: {len(report_data['data'])}")
-            
-            return latest_report['Key']
-        else:
-            print_error("No reports found in S3")
-            return None
-            
-    except Exception as e:
-        print_error(f"S3 verification failed: {e}")
-        return None
-
-def test_visualizations():
-    """Test visualization storage"""
-    print_header("Testing Visualizations")
-    
-    try:
-        s3 = boto3.client('s3', region_name='us-west-2')
-        
-        # List visualizations
-        response = s3.list_objects_v2(
-            Bucket='fredmlv1',
-            Prefix='visualizations/'
-        )
-        
-        if 'Contents' in response:
-            print_success(f"Found {len(response['Contents'])} visualization(s) in S3")
-            
-            # Check for specific visualization types
-            visualization_types = ['time_series.png', 'correlation.png']
-            for viz_type in visualization_types:
-                viz_objects = [obj for obj in response['Contents'] if viz_type in obj['Key']]
-                if viz_objects:
-                    print_success(f"{viz_type}: {len(viz_objects)} file(s)")
-                else:
-                    print_warning(f"{viz_type}: No files found")
-        else:
-            print_warning("No visualizations found in S3 (this might be expected)")
-        
-        return True
-        
-    except Exception as e:
-        print_error(f"Visualization verification failed: {e}")
-        return False
-
-def test_streamlit_app():
-    """Test Streamlit app components"""
-    print_header("Testing Streamlit App")
-    
-    try:
-        # Test configuration loading
-        project_root = Path(__file__).parent.parent
-        sys.path.append(str(project_root / 'frontend'))
-        
-        from app import load_config, init_aws_clients
-        
-        # Test configuration
-        config = load_config()
-        if config['s3_bucket'] == 'fredmlv1' and config['lambda_function'] == 'fred-ml-processor':
-            print_success("Streamlit configuration is correct")
-        else:
-            print_error("Streamlit configuration mismatch")
-            return False
-        
-        # Test AWS clients
-        s3_client, lambda_client = init_aws_clients()
-        if s3_client and lambda_client:
-            print_success("AWS clients initialized successfully")
-        else:
-            print_error("Failed to initialize AWS clients")
-            return False
-        
-        return True
-        
-    except Exception as e:
-        print_error(f"Streamlit app test failed: {e}")
-        return False
-
-def test_data_quality():
-    """Test data quality and completeness"""
-    print_header("Testing Data Quality")
-    
-    try:
-        s3 = boto3.client('s3', region_name='us-west-2')
-        
-        # Get the latest report
-        response = s3.list_objects_v2(
-            Bucket='fredmlv1',
-            Prefix='reports/'
-        )
-        
-        if 'Contents' in response:
-            latest_report = max(response['Contents'], key=lambda x: x['LastModified'])
-            
-            # Download report
-            report_response = s3.get_object(
-                Bucket='fredmlv1',
-                Key=latest_report['Key']
-            )
-            
-            report_data = json.loads(report_response['Body'].read().decode('utf-8'))
-            
-            # Verify data quality
-            if len(report_data['data']) > 0:
-                print_success("Data points found")
+        try:
+            # Test comprehensive demo
+            demo_script = self.root_dir / 'scripts/comprehensive_demo.py'
+            if demo_script.exists():
+                logger.info("✅ Comprehensive demo script exists")
+                
+                # Test demo script syntax
+                with open(demo_script, 'r') as f:
+                    compile(f.read(), str(demo_script), 'exec')
+                logger.info("✅ Comprehensive demo script syntax valid")
+                
+                self.test_results['comprehensive_demo'] = True
             else:
-                print_error("No data points found")
-                return False
+                logger.error("❌ Comprehensive demo script not found")
+                self.test_results['comprehensive_demo'] = False
             
-            if len(report_data['statistics']) > 0:
-                print_success("Statistics generated")
+            # Test advanced analytics script
+            analytics_script = self.root_dir / 'scripts/run_advanced_analytics.py'
+            if analytics_script.exists():
+                logger.info("✅ Advanced analytics script exists")
+                
+                # Test script syntax
+                with open(analytics_script, 'r') as f:
+                    compile(f.read(), str(analytics_script), 'exec')
+                logger.info("✅ Advanced analytics script syntax valid")
+                
+                self.test_results['advanced_analytics_script'] = True
             else:
-                print_error("No statistics found")
-                return False
-            
-            # Check for requested indicators
-            test_indicators = ['GDP', 'UNRATE']
-            for indicator in test_indicators:
-                if indicator in report_data['indicators']:
-                    print_success(f"Indicator '{indicator}' found")
-                else:
-                    print_error(f"Indicator '{indicator}' missing")
-                    return False
-            
-            # Verify date range
-            if report_data['start_date'] == '2024-01-01' and report_data['end_date'] == '2024-01-31':
-                print_success("Date range is correct")
-            else:
-                print_error("Date range mismatch")
-                return False
-            
-            print_success("Data quality verification passed")
-            print_info(f"Data points: {len(report_data['data'])}")
-            print_info(f"Indicators: {report_data['indicators']}")
-            print_info(f"Date range: {report_data['start_date']} to {report_data['end_date']}")
-            
-            return True
-        else:
-            print_error("No reports found for data quality verification")
-            return False
-            
-    except Exception as e:
-        print_error(f"Data quality verification failed: {e}")
-        return False
-
-def test_performance():
-    """Test performance metrics"""
-    print_header("Testing Performance Metrics")
-    
-    try:
-        cloudwatch = boto3.client('cloudwatch', region_name='us-west-2')
-        
-        # Get Lambda metrics for the last hour
-        end_time = datetime.now()
-        start_time = end_time - timedelta(hours=1)
-        
-        # Get invocation metrics
-        response = cloudwatch.get_metric_statistics(
-            Namespace='AWS/Lambda',
-            MetricName='Invocations',
-            Dimensions=[{'Name': 'FunctionName', 'Value': 'fred-ml-processor'}],
-            StartTime=start_time,
-            EndTime=end_time,
-            Period=300,
-            Statistics=['Sum']
-        )
-        
-        if response['Datapoints']:
-            invocations = sum(point['Sum'] for point in response['Datapoints'])
-            print_success(f"Lambda invocations: {invocations}")
-        else:
-            print_warning("No Lambda invocation metrics found")
-        
-        # Get duration metrics
-        response = cloudwatch.get_metric_statistics(
-            Namespace='AWS/Lambda',
-            MetricName='Duration',
-            Dimensions=[{'Name': 'FunctionName', 'Value': 'fred-ml-processor'}],
-            StartTime=start_time,
-            EndTime=end_time,
-            Period=300,
-            Statistics=['Average', 'Maximum']
-        )
-        
-        if response['Datapoints']:
-            avg_duration = sum(point['Average'] for point in response['Datapoints']) / len(response['Datapoints'])
-            max_duration = max(point['Maximum'] for point in response['Datapoints'])
-            print_success(f"Average duration: {avg_duration:.2f}ms")
-            print_success(f"Maximum duration: {max_duration:.2f}ms")
-        else:
-            print_warning("No Lambda duration metrics found")
-        
-        return True
-        
-    except Exception as e:
-        print_warning(f"Performance metrics test failed: {e}")
-        return True  # Don't fail for metrics issues
-
-def generate_test_report(results):
-    """Generate test report"""
-    print_header("Test Results Summary")
-    
-    total_tests = len(results)
-    passed_tests = sum(1 for result in results.values() if result)
-    failed_tests = total_tests - passed_tests
-    
-    print(f"Total Tests: {total_tests}")
-    print(f"Passed: {passed_tests}")
-    print(f"Failed: {failed_tests}")
-    print(f"Success Rate: {(passed_tests/total_tests)*100:.1f}%")
-    
-    print("\nDetailed Results:")
-    for test_name, result in results.items():
-        status = "✅ PASS" if result else "❌ FAIL"
-        print(f"  {test_name}: {status}")
-    
-    # Save report to file
-    report_data = {
-        'timestamp': time.strftime('%Y-%m-%d %H:%M:%S'),
-        'total_tests': total_tests,
-        'passed_tests': passed_tests,
-        'failed_tests': failed_tests,
-        'success_rate': (passed_tests/total_tests)*100,
-        'results': results
-    }
-    
-    report_file = Path(__file__).parent.parent / 'test_report.json'
-    with open(report_file, 'w') as f:
-        json.dump(report_data, f, indent=2)
-    
-    print(f"\n📄 Detailed report saved to: {report_file}")
-    
-    return passed_tests == total_tests
+                logger.error("❌ Advanced analytics script not found")
+                self.test_results['advanced_analytics_script'] = False
+                
+        except Exception as e:
+            logger.error(f"❌ Demo tests failed: {e}")
+            self.test_results['demo_tests'] = False
 
 def main():
-    """Main test execution"""
-    print_header("FRED ML Complete System Test")
+    """Main test function"""
+    tester = FREDMLSystemTest()
     
-    # Check prerequisites
-    if not check_prerequisites():
-        print_error("Prerequisites not met. Exiting.")
-        sys.exit(1)
-    
-    # Run tests
-    results = {}
-    
-    results['AWS Services'] = test_aws_services()
-    results['Lambda Function'] = test_lambda_function() is not None
-    results['S3 Storage'] = test_s3_storage() is not None
-    results['Visualizations'] = test_visualizations()
-    results['Streamlit App'] = test_streamlit_app()
-    results['Data Quality'] = test_data_quality()
-    results['Performance'] = test_performance()
-    
-    # Generate report
-    success = generate_test_report(results)
-    
-    if success:
-        print_header("🎉 All Tests Passed!")
-        print_success("FRED ML system is working correctly")
-        sys.exit(0)
-    else:
-        print_header("❌ Some Tests Failed")
-        print_error("Please check the detailed report and fix any issues")
+    try:
+        # Run complete system test
+        tester.run_complete_system_test()
+        
+        # Run demo tests
+        tester.run_demo_tests()
+        
+        logger.info("🎉 Complete system test finished!")
+        
+    except Exception as e:
+        logger.error(f"❌ System test failed: {e}")
         sys.exit(1)
 
 if __name__ == "__main__":

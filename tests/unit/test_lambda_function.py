@@ -1,25 +1,27 @@
 #!/usr/bin/env python3
 """
-Unit Tests for Lambda Function
+Unit tests for FRED ML Lambda Function
+Tests core functionality without AWS dependencies
 """
 
 import pytest
-import json
-import os
 import sys
+import json
+import pandas as pd
+import numpy as np
+from unittest.mock import Mock, patch
 from pathlib import Path
-from unittest.mock import Mock, patch, MagicMock
 
-# Add project root to path
+# Add src to path
 project_root = Path(__file__).parent.parent.parent
-sys.path.append(str(project_root))
+sys.path.append(str(project_root / 'src'))
 
 class TestLambdaFunction:
-    """Unit tests for Lambda function"""
+    """Test cases for Lambda function core functionality"""
     
     @pytest.fixture
     def mock_event(self):
-        """Mock event for testing"""
+        """Mock Lambda event"""
         return {
             'indicators': ['GDP', 'UNRATE'],
             'start_date': '2024-01-01',
@@ -27,149 +29,30 @@ class TestLambdaFunction:
             'options': {
                 'visualizations': True,
                 'correlation': True,
-                'forecasting': False,
                 'statistics': True
             }
         }
     
     @pytest.fixture
     def mock_context(self):
-        """Mock context for testing"""
+        """Mock Lambda context"""
         context = Mock()
         context.function_name = 'fred-ml-processor'
         context.function_version = '$LATEST'
         context.invoked_function_arn = 'arn:aws:lambda:us-west-2:123456789012:function:fred-ml-processor'
         context.memory_limit_in_mb = 512
         context.remaining_time_in_millis = 300000
-        context.log_group_name = '/aws/lambda/fred-ml-processor'
-        context.log_stream_name = '2024/01/01/[$LATEST]123456789012'
         return context
     
-    @patch('lambda.lambda_function.os.environ.get')
-    @patch('lambda.lambda_function.boto3.client')
-    def test_lambda_handler_success(self, mock_boto3_client, mock_os_environ, mock_event, mock_context):
-        """Test successful Lambda function execution"""
-        # Mock environment variables
-        mock_os_environ.side_effect = lambda key, default=None: {
-            'FRED_API_KEY': 'test-api-key',
-            'S3_BUCKET': 'fredmlv1'
-        }.get(key, default)
-        
-        # Mock AWS clients
-        mock_s3_client = Mock()
-        mock_lambda_client = Mock()
-        mock_boto3_client.side_effect = [mock_s3_client, mock_lambda_client]
-        
-        # Mock FRED API response
-        with patch('lambda.lambda_function.requests.get') as mock_requests:
-            mock_response = Mock()
-            mock_response.status_code = 200
-            mock_response.json.return_value = {
-                'observations': [
-                    {'date': '2024-01-01', 'value': '100.0'},
-                    {'date': '2024-01-02', 'value': '101.0'}
-                ]
-            }
-            mock_requests.return_value = mock_response
-            
-            # Import and test Lambda function
-            sys.path.append(str(project_root / 'lambda'))
-            from lambda_function import lambda_handler
-            
-            response = lambda_handler(mock_event, mock_context)
-            
-            # Verify response structure
-            assert response['statusCode'] == 200
-            assert 'body' in response
-            
-            response_body = json.loads(response['body'])
-            assert response_body['status'] == 'success'
-            assert 'report_id' in response_body
-            assert 'report_key' in response_body
-    
-    @patch('lambda.lambda_function.os.environ.get')
-    def test_lambda_handler_missing_api_key(self, mock_os_environ, mock_event, mock_context):
-        """Test Lambda function with missing API key"""
-        # Mock missing API key
-        mock_os_environ.return_value = None
-        
-        sys.path.append(str(project_root / 'lambda'))
-        from lambda_function import lambda_handler
-        
-        response = lambda_handler(mock_event, mock_context)
-        
-        # Should handle missing API key gracefully
-        assert response['statusCode'] == 500
-        response_body = json.loads(response['body'])
-        assert response_body['status'] == 'error'
-    
-    def test_lambda_handler_invalid_event(self, mock_context):
-        """Test Lambda function with invalid event"""
-        invalid_event = {}
-        
-        sys.path.append(str(project_root / 'lambda'))
-        from lambda_function import lambda_handler
-        
-        response = lambda_handler(invalid_event, mock_context)
-        
-        # Should handle invalid event gracefully
-        assert response['statusCode'] == 200 or response['statusCode'] == 500
-    
-    @patch('lambda.lambda_function.os.environ.get')
-    @patch('lambda.lambda_function.boto3.client')
-    def test_fred_data_fetching(self, mock_boto3_client, mock_os_environ):
-        """Test FRED data fetching functionality"""
-        # Mock environment
-        mock_os_environ.side_effect = lambda key, default=None: {
-            'FRED_API_KEY': 'test-api-key',
-            'S3_BUCKET': 'fredmlv1'
-        }.get(key, default)
-        
-        mock_s3_client = Mock()
-        mock_lambda_client = Mock()
-        mock_boto3_client.side_effect = [mock_s3_client, mock_lambda_client]
-        
-        sys.path.append(str(project_root / 'lambda'))
-        from lambda_function import get_fred_data
-        
-        # Mock successful API response
-        with patch('lambda.lambda_function.requests.get') as mock_requests:
-            mock_response = Mock()
-            mock_response.status_code = 200
-            mock_response.json.return_value = {
-                'observations': [
-                    {'date': '2024-01-01', 'value': '100.0'},
-                    {'date': '2024-01-02', 'value': '101.0'}
-                ]
-            }
-            mock_requests.return_value = mock_response
-            
-            result = get_fred_data('GDP', '2024-01-01', '2024-01-31')
-            
-            assert result is not None
-            assert len(result) > 0
-    
-    @patch('lambda.lambda_function.os.environ.get')
-    @patch('lambda.lambda_function.boto3.client')
-    def test_dataframe_creation(self, mock_boto3_client, mock_os_environ):
+    def test_create_dataframe(self):
         """Test DataFrame creation from series data"""
-        # Mock environment
-        mock_os_environ.side_effect = lambda key, default=None: {
-            'FRED_API_KEY': 'test-api-key',
-            'S3_BUCKET': 'fredmlv1'
-        }.get(key, default)
-        
-        mock_s3_client = Mock()
-        mock_lambda_client = Mock()
-        mock_boto3_client.side_effect = [mock_s3_client, mock_lambda_client]
-        
         from lambda.lambda_function import create_dataframe
-        import pandas as pd
         
-        # Mock series data
+        # Create mock series data
+        dates = pd.date_range('2024-01-01', '2024-01-05', freq='D')
         series_data = {
-            'GDP': pd.Series([100.0, 101.0], index=pd.to_datetime(['2024-01-01', '2024-01-02'])),
-            'UNRATE': pd.Series([3.5, 3.6], index=pd.to_datetime(['2024-01-01', '2024-01-02']))
+            'GDP': pd.Series([100.0, 101.0, 102.0, 103.0, 104.0], index=dates),
+            'UNRATE': pd.Series([3.5, 3.6, 3.7, 3.8, 3.9], index=dates)
         }
         
         df = create_dataframe(series_data)
@@ -177,30 +60,19 @@ class TestLambdaFunction:
         assert not df.empty
         assert 'GDP' in df.columns
         assert 'UNRATE' in df.columns
-        assert len(df) == 2
+        assert len(df) == 5
+        assert df.index.name == 'Date'
     
-    @patch('lambda.lambda_function.os.environ.get')
-    @patch('lambda.lambda_function.boto3.client')
-    def test_statistics_generation(self, mock_boto3_client, mock_os_environ):
+    def test_generate_statistics(self):
         """Test statistics generation"""
-        # Mock environment
-        mock_os_environ.side_effect = lambda key, default=None: {
-            'FRED_API_KEY': 'test-api-key',
-            'S3_BUCKET': 'fredmlv1'
-        }.get(key, default)
-        
-        mock_s3_client = Mock()
-        mock_lambda_client = Mock()
-        mock_boto3_client.side_effect = [mock_s3_client, mock_lambda_client]
-        
         from lambda.lambda_function import generate_statistics
-        import pandas as pd
         
         # Create test DataFrame
+        dates = pd.date_range('2024-01-01', '2024-01-05', freq='D')
         df = pd.DataFrame({
-            'GDP': [100.0, 101.0, 102.0],
-            'UNRATE': [3.5, 3.6, 3.7]
-        })
+            'GDP': [100.0, 101.0, 102.0, 103.0, 104.0],
+            'UNRATE': [3.5, 3.6, 3.7, 3.8, 3.9]
+        }, index=dates)
         
         stats = generate_statistics(df)
         
@@ -210,36 +82,121 @@ class TestLambdaFunction:
         assert 'std' in stats['GDP']
         assert 'min' in stats['GDP']
         assert 'max' in stats['GDP']
+        assert 'count' in stats['GDP']
+        assert 'missing' in stats['GDP']
+        
+        # Verify calculations
+        assert stats['GDP']['mean'] == 102.0
+        assert stats['GDP']['min'] == 100.0
+        assert stats['GDP']['max'] == 104.0
+        assert stats['GDP']['count'] == 5
     
-    @patch('lambda.lambda_function.os.environ.get')
-    @patch('lambda.lambda_function.boto3.client')
-    def test_s3_report_storage(self, mock_boto3_client, mock_os_environ):
-        """Test S3 report storage"""
-        # Mock environment
-        mock_os_environ.side_effect = lambda key, default=None: {
-            'FRED_API_KEY': 'test-api-key',
-            'S3_BUCKET': 'fredmlv1'
-        }.get(key, default)
+    def test_create_correlation_matrix(self):
+        """Test correlation matrix creation"""
+        from lambda.lambda_function import create_correlation_matrix
         
-        mock_s3_client = Mock()
-        mock_lambda_client = Mock()
-        mock_boto3_client.side_effect = [mock_s3_client, mock_lambda_client]
+        # Create test DataFrame
+        dates = pd.date_range('2024-01-01', '2024-01-05', freq='D')
+        df = pd.DataFrame({
+            'GDP': [100.0, 101.0, 102.0, 103.0, 104.0],
+            'UNRATE': [3.5, 3.6, 3.7, 3.8, 3.9]
+        }, index=dates)
         
-        from lambda.lambda_function import save_report_to_s3
+        corr_matrix = create_correlation_matrix(df)
         
-        # Test report data
-        report_data = {
-            'report_id': 'test_report_123',
-            'timestamp': '2024-01-01T00:00:00',
-            'indicators': ['GDP'],
-            'data': []
+        assert 'GDP' in corr_matrix
+        assert 'UNRATE' in corr_matrix
+        assert 'GDP' in corr_matrix['GDP']
+        assert 'UNRATE' in corr_matrix['UNRATE']
+        
+        # Verify correlation values
+        assert corr_matrix['GDP']['GDP'] == 1.0
+        assert corr_matrix['UNRATE']['UNRATE'] == 1.0
+    
+    @patch('lambda.lambda_function.requests.get')
+    def test_get_fred_data_success(self, mock_requests):
+        """Test successful FRED data fetching"""
+        from lambda.lambda_function import get_fred_data
+        
+        # Mock successful API response
+        mock_response = Mock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {
+            'observations': [
+                {'date': '2024-01-01', 'value': '100.0'},
+                {'date': '2024-01-02', 'value': '101.0'},
+                {'date': '2024-01-03', 'value': '102.0'}
+            ]
         }
+        mock_requests.return_value = mock_response
         
-        result = save_report_to_s3(report_data, 'fredmlv1', 'test_report_123')
+        # Mock environment variable
+        with patch('lambda.lambda_function.FRED_API_KEY', 'test-api-key'):
+            result = get_fred_data('GDP', '2024-01-01', '2024-01-03')
         
-        # Verify S3 put_object was called
-        mock_s3_client.put_object.assert_called_once()
-        call_args = mock_s3_client.put_object.call_args
-        assert call_args[1]['Bucket'] == 'fredmlv1'
-        assert 'test_report_123' in call_args[1]['Key']
-        assert call_args[1]['ContentType'] == 'application/json' 
+        assert result is not None
+        assert len(result) == 3
+        assert result.name == 'GDP'
+        assert result.iloc[0] == 100.0
+        assert result.iloc[1] == 101.0
+        assert result.iloc[2] == 102.0
+    
+    @patch('lambda.lambda_function.requests.get')
+    def test_get_fred_data_failure(self, mock_requests):
+        """Test FRED data fetching failure"""
+        from lambda.lambda_function import get_fred_data
+        
+        # Mock failed API response
+        mock_response = Mock()
+        mock_response.status_code = 404
+        mock_requests.return_value = mock_response
+        
+        result = get_fred_data('INVALID', '2024-01-01', '2024-01-03')
+        
+        assert result is None
+    
+    def test_create_dataframe_empty_data(self):
+        """Test DataFrame creation with empty data"""
+        from lambda.lambda_function import create_dataframe
+        
+        # Test with empty series data
+        df = create_dataframe({})
+        assert df.empty
+        
+        # Test with None values
+        df = create_dataframe({'GDP': None, 'UNRATE': None})
+        assert df.empty
+    
+    def test_generate_statistics_empty_data(self):
+        """Test statistics generation with empty data"""
+        from lambda.lambda_function import generate_statistics
+        
+        # Test with empty DataFrame
+        df = pd.DataFrame()
+        stats = generate_statistics(df)
+        assert stats == {}
+        
+        # Test with DataFrame containing only NaN values
+        df = pd.DataFrame({
+            'GDP': [np.nan, np.nan, np.nan],
+            'UNRATE': [np.nan, np.nan, np.nan]
+        })
+        stats = generate_statistics(df)
+        assert 'GDP' in stats
+        assert stats['GDP']['count'] == 0
+        assert stats['GDP']['missing'] == 3
+    
+    def test_create_correlation_matrix_empty_data(self):
+        """Test correlation matrix creation with empty data"""
+        from lambda.lambda_function import create_correlation_matrix
+        
+        # Test with empty DataFrame
+        df = pd.DataFrame()
+        corr_matrix = create_correlation_matrix(df)
+        assert corr_matrix == {}
+        
+        # Test with single column
+        df = pd.DataFrame({'GDP': [100.0, 101.0, 102.0]})
+        corr_matrix = create_correlation_matrix(df)
+        assert 'GDP' in corr_matrix
+        assert corr_matrix['GDP']['GDP'] == 1.0 
