@@ -1,0 +1,13 @@
+{
+  "analysis_type": "comprehensive",
+  "timestamp": "2025-07-11T21:28:22.319221",
+  "charts_generated": [
+    "time_series",
+    "correlation",
+    "distributions",
+    "pca",
+    "clustering",
+    "forecast"
+  ],
+  "output_dir": "/Users/edwin/Desktop/Business/Technological/FRED_ML/data/exports/visualizations"
+}
