@@ -22,5 +22,5 @@ if not fred_key:
 # 4) Import and run your real app
 from frontend.app import main as app_main
 
-if __name__ == "__main__":
-    app_main() 
+# Call the main function directly for Streamlit Cloud
+app_main() 

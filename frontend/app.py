@@ -432,9 +432,6 @@ def main():
         st.info("Get a free FRED API key at: https://fred.stlouisfed.org/docs/api/api_key.html")
         st.stop()
     
-    # Add debug print
-    st.write(f"🔑 FRED API Key loaded: {fred_key[:8]}...")
-    
     # Show loading indicator
     with st.spinner("🚀 Initializing FRED ML Platform..."):
         # Load configuration
