@@ -438,8 +438,23 @@ def main():
         st.stop()
     
     # Initialize AWS clients and config for real data mode
-    s3_client, lambda_client = init_aws_clients()
-    config = load_app_config()
+    try:
+        s3_client, lambda_client = init_aws_clients()
+        print(f"DEBUG: AWS clients initialized - s3_client: {s3_client is not None}, lambda_client: {lambda_client is not None}")
+    except Exception as e:
+        print(f"DEBUG: Failed to initialize AWS clients: {e}")
+        s3_client, lambda_client = None, None
+    
+    try:
+        config = load_app_config()
+        print(f"DEBUG: App config loaded: {config}")
+    except Exception as e:
+        print(f"DEBUG: Failed to load app config: {e}")
+        config = {
+            's3_bucket': 'fredmlv1',
+            'lambda_function': 'fred-ml-processor',
+            'api_endpoint': 'http://localhost:8000'
+        }
     
     # Force analytics to be available if loading succeeded
     if ANALYTICS_AVAILABLE:
