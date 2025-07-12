@@ -8,7 +8,14 @@ import streamlit as st
 import pandas as pd
 import os
 import sys
+import io
 from typing import Dict, List, Optional
+from dotenv import load_dotenv
+load_dotenv()
+
+import os
+print("DEBUG: FRED_API_KEY from os.getenv =", os.getenv('FRED_API_KEY'))
+print("DEBUG: FRED_API_KEY from shell =", os.environ.get('FRED_API_KEY'))
 
 # Page configuration - MUST be first Streamlit command
 st.set_page_config(
@@ -37,7 +44,7 @@ def get_requests():
     return requests
 
 # Initialize flags
-ANALYTICS_AVAILABLE = False
+ANALYTICS_AVAILABLE = True  # Set to True by default since modules exist
 FRED_API_AVAILABLE = False
 CONFIG_AVAILABLE = False
 REAL_DATA_MODE = False
@@ -53,9 +60,11 @@ def load_analytics():
         from src.analysis.comprehensive_analytics import ComprehensiveAnalytics
         from src.core.enhanced_fred_client import EnhancedFREDClient
         ANALYTICS_AVAILABLE = True
+        print(f"DEBUG: Analytics loaded successfully, ANALYTICS_AVAILABLE = {ANALYTICS_AVAILABLE}")
         return True
-    except ImportError:
+    except ImportError as e:
         ANALYTICS_AVAILABLE = False
+        print(f"DEBUG: Analytics loading failed: {e}, ANALYTICS_AVAILABLE = {ANALYTICS_AVAILABLE}")
         return False
 
 # Get FRED API key from environment
@@ -66,7 +75,7 @@ def load_fred_client():
     """Load FRED API client only when needed"""
     global FRED_API_AVAILABLE
     try:
-        from fred_api_client import get_real_economic_data, generate_real_insights
+        from frontend.fred_api_client import get_real_economic_data, generate_real_insights
         FRED_API_AVAILABLE = True
         return True
     except ImportError:
@@ -77,15 +86,28 @@ def load_fred_client():
 def load_config():
     """Load configuration only when needed"""
     global CONFIG_AVAILABLE, FRED_API_KEY, REAL_DATA_MODE
+    
+    # Try multiple sources for FRED API key
+    fred_key = os.getenv('FRED_API_KEY')
+    if not fred_key:
+        try:
+            fred_key = st.secrets.get("FRED_API_KEY")
+        except:
+            pass
+    
+    print("DEBUG: Final FRED_API_KEY =", fred_key)
+    
     try:
         from config import Config
         CONFIG_AVAILABLE = True
-        FRED_API_KEY = Config.get_fred_api_key()
-        REAL_DATA_MODE = Config.validate_fred_api_key()
+        if not fred_key:
+            fred_key = Config.get_fred_api_key()
+        FRED_API_KEY = fred_key
+        REAL_DATA_MODE = Config.validate_fred_api_key() if fred_key else False
         return True
     except ImportError:
         CONFIG_AVAILABLE = False
-        FRED_API_KEY = os.getenv('FRED_API_KEY')
+        FRED_API_KEY = fred_key
         REAL_DATA_MODE = FRED_API_KEY and FRED_API_KEY != 'your-fred-api-key-here'
         return False
 
@@ -219,7 +241,7 @@ def init_aws_clients():
 
 # Load configuration
 @st.cache_data
-def load_config():
+def load_app_config():
     """Load application configuration"""
     return {
         's3_bucket': os.getenv('S3_BUCKET', 'fredmlv1'),
@@ -407,12 +429,25 @@ def main():
     with st.spinner("🚀 Initializing FRED ML Platform..."):
         # Load configuration
         load_config()
+        load_fred_client()
+        load_analytics()
+        
+        # Force analytics to be available if loading succeeded
+        if ANALYTICS_AVAILABLE:
+            print("DEBUG: Analytics loaded successfully in main function")
+        else:
+            print("DEBUG: Analytics failed to load in main function")
         
         # Initialize AWS clients
         s3_client, lambda_client = init_aws_clients()
-        config = load_config()
+        config = load_app_config()
     
     # Show data mode info
+    print(f"DEBUG: REAL_DATA_MODE = {REAL_DATA_MODE}")
+    print(f"DEBUG: FRED_API_AVAILABLE = {FRED_API_AVAILABLE}")
+    print(f"DEBUG: ANALYTICS_AVAILABLE = {ANALYTICS_AVAILABLE}")
+    print(f"DEBUG: FRED_API_KEY = {FRED_API_KEY}")
+    
     if REAL_DATA_MODE:
         st.success("🎯 Using real FRED API data for live economic insights.")
     else:
@@ -462,10 +497,13 @@ def show_executive_dashboard(s3_client, config):
     # Key metrics row with real data
     col1, col2, col3, col4 = st.columns(4)
     
+    print(f"DEBUG: In executive dashboard - REAL_DATA_MODE = {REAL_DATA_MODE}, FRED_API_AVAILABLE = {FRED_API_AVAILABLE}")
+    
     if REAL_DATA_MODE and FRED_API_AVAILABLE:
         # Get real insights from FRED API
         try:
             load_fred_client()
+            from frontend.fred_api_client import generate_real_insights
             insights = generate_real_insights(FRED_API_KEY)
             
             with col1:
@@ -561,32 +599,11 @@ def show_executive_dashboard(s3_client, config):
                         corr_fig = create_correlation_heatmap(df)
                         st.plotly_chart(corr_fig, use_container_width=True)
             else:
-                st.info("📊 Demo Analysis Results")
-                st.markdown("""
-                **Recent Economic Analysis Summary:**
-                - GDP growth showing moderate expansion
-                - Industrial production recovering from supply chain disruptions
-                - Inflation moderating from peak levels
-                - Labor market remains tight with strong job creation
-                """)
+                st.error("❌ Could not retrieve real report data.")
         else:
-            st.info("📊 Demo Analysis Results")
-            st.markdown("""
-            **Recent Economic Analysis Summary:**
-            - GDP growth showing moderate expansion
-            - Industrial production recovering from supply chain disruptions
-            - Inflation moderating from peak levels
-            - Labor market remains tight with strong job creation
-            """)
+            st.info("No reports available. Run an analysis to generate reports.")
     else:
-        st.info("📊 Demo Analysis Results")
-        st.markdown("""
-        **Recent Economic Analysis Summary:**
-        - GDP growth showing moderate expansion
-        - Industrial production recovering from supply chain disruptions
-        - Inflation moderating from peak levels
-        - Labor market remains tight with strong job creation
-        """)
+        st.info("No reports available. Run an analysis to generate reports.")
 
 def show_advanced_analytics_page(s3_client, config):
     """Show advanced analytics page with comprehensive analysis capabilities"""
@@ -680,6 +697,7 @@ def show_advanced_analytics_page(s3_client, config):
                     load_fred_client()
                     
                     # Get real economic data
+                    from frontend.fred_api_client import get_real_economic_data
                     real_data = get_real_economic_data(FRED_API_KEY, 
                                                      start_date_input.strftime('%Y-%m-%d'),
                                                      end_date_input.strftime('%Y-%m-%d'))
@@ -734,7 +752,7 @@ def show_advanced_analytics_page(s3_client, config):
                             # Create sample DataFrame for visualization
                             import pandas as pd
                             import numpy as np
-                            dates = pd.date_range('2020-01-01', periods=50, freq='ME')
+                            dates = pd.date_range('2020-01-01', periods=50, freq='M')
                             sample_data = pd.DataFrame({
                                 'GDPC1': np.random.normal(100, 10, 50),
                                 'INDPRO': np.random.normal(50, 5, 50),
@@ -1017,6 +1035,8 @@ def show_indicators_page(s3_client, config):
     # Indicators overview with real insights
     if REAL_DATA_MODE and FRED_API_AVAILABLE:
         try:
+            load_fred_client()
+            from frontend.fred_api_client import generate_real_insights
             insights = generate_real_insights(FRED_API_KEY)
             indicators_info = {
                 "GDPC1": {"name": "Real GDP", "description": "Real Gross Domestic Product", "frequency": "Quarterly"},
@@ -1066,85 +1086,9 @@ def show_indicators_page(s3_client, config):
                         """, unsafe_allow_html=True)
         except Exception as e:
             st.error(f"Failed to fetch real data: {e}")
-            # Fallback to demo data
-            if DEMO_MODE:
-                insights = DEMO_DATA['insights']
-                # ... demo data display
-            else:
-                # Static fallback
-                pass
-    
-    elif DEMO_MODE:
-        insights = DEMO_DATA['insights']
-        indicators_info = {
-            "GDPC1": {"name": "Real GDP", "description": "Real Gross Domestic Product", "frequency": "Quarterly"},
-            "INDPRO": {"name": "Industrial Production", "description": "Industrial Production Index", "frequency": "Monthly"},
-            "RSAFS": {"name": "Retail Sales", "description": "Retail Sales", "frequency": "Monthly"},
-            "CPIAUCSL": {"name": "Consumer Price Index", "description": "Inflation measure", "frequency": "Monthly"},
-            "FEDFUNDS": {"name": "Federal Funds Rate", "description": "Target interest rate", "frequency": "Daily"},
-            "DGS10": {"name": "10-Year Treasury", "description": "Government bond yield", "frequency": "Daily"}
-        }
-        
-        # Display indicators in cards with insights
-        cols = st.columns(3)
-        for i, (code, info) in enumerate(indicators_info.items()):
-            with cols[i % 3]:
-                if code in insights:
-                    insight = insights[code]
-                    st.markdown(f"""
-                    <div class="metric-card">
-                        <h3>{info['name']}</h3>
-                        <p><strong>Code:</strong> {code}</p>
-                        <p><strong>Frequency:</strong> {info['frequency']}</p>
-                        <p><strong>Current Value:</strong> {insight['current_value']}</p>
-                        <p><strong>Growth Rate:</strong> {insight['growth_rate']}</p>
-                        <p><strong>Trend:</strong> {insight['trend']}</p>
-                        <p><strong>Forecast:</strong> {insight['forecast']}</p>
-                        <hr>
-                        <p><strong>Key Insight:</strong></p>
-                        <p style="font-size: 0.9em; color: #666;">{insight['key_insight']}</p>
-                        <p><strong>Risk Factors:</strong></p>
-                        <ul style="font-size: 0.8em; color: #d62728;">
-                            {''.join([f'<li>{risk}</li>' for risk in insight['risk_factors']])}
-                        </ul>
-                        <p><strong>Opportunities:</strong></p>
-                        <ul style="font-size: 0.8em; color: #2ca02c;">
-                            {''.join([f'<li>{opp}</li>' for opp in insight['opportunities']])}
-                        </ul>
-                    </div>
-                    """, unsafe_allow_html=True)
-                else:
-                    st.markdown(f"""
-                    <div class="metric-card">
-                        <h3>{info['name']}</h3>
-                        <p><strong>Code:</strong> {code}</p>
-                        <p><strong>Frequency:</strong> {info['frequency']}</p>
-                        <p>{info['description']}</p>
-                    </div>
-                    """, unsafe_allow_html=True)
     else:
-        # Fallback to basic info
-        indicators_info = {
-            "GDPC1": {"name": "Real GDP", "description": "Real Gross Domestic Product", "frequency": "Quarterly"},
-            "INDPRO": {"name": "Industrial Production", "description": "Industrial Production Index", "frequency": "Monthly"},
-            "RSAFS": {"name": "Retail Sales", "description": "Retail Sales", "frequency": "Monthly"},
-            "CPIAUCSL": {"name": "Consumer Price Index", "description": "Inflation measure", "frequency": "Monthly"},
-            "FEDFUNDS": {"name": "Federal Funds Rate", "description": "Target interest rate", "frequency": "Daily"},
-            "DGS10": {"name": "10-Year Treasury", "description": "Government bond yield", "frequency": "Daily"}
-        }
-        
-        # Display indicators in cards
-        cols = st.columns(3)
-        for i, (code, info) in enumerate(indicators_info.items()):
-            with cols[i % 3]:
-                st.markdown(f"""
-                <div class="metric-card">
-                    <h3>{info['name']}</h3>
-                    <p><strong>Code:</strong> {code}</p>
-                    <p><strong>Frequency:</strong> {info['frequency']}</p>
-                    <p>{info['description']}</p>
-                </div>
-                """, unsafe_allow_html=True)
+        st.error("❌ FRED API not available. Please configure your FRED API key.")
+        st.info("Get a free FRED API key at: https://fred.stlouisfed.org/docs/api/api_key.html")
 
 def show_reports_page(s3_client, config):
     """Show reports and insights page"""
@@ -1358,6 +1302,7 @@ def show_downloads_page(s3_client, config):
         try:
             # Load FRED client and get real data
             load_fred_client()
+            from frontend.fred_api_client import get_real_economic_data
             real_data = get_real_economic_data(FRED_API_KEY, 
                                              (datetime.now() - timedelta(days=365)).strftime('%Y-%m-%d'),
                                              datetime.now().strftime('%Y-%m-%d'))
@@ -1542,9 +1487,16 @@ def show_configuration_page(config):
     with col2:
         st.write("**API Configuration**")
         st.write(f"API Endpoint: {config['api_endpoint']}")
-        st.write(f"Analytics Available: {ANALYTICS_AVAILABLE}")
+        try:
+            from src.analysis.comprehensive_analytics import ComprehensiveAnalytics
+            from src.core.enhanced_fred_client import EnhancedFREDClient
+            analytics_status = True
+        except ImportError:
+            analytics_status = False
+        st.write(f"Analytics Available: {analytics_status}")
         st.write(f"Real Data Mode: {REAL_DATA_MODE}")
         st.write(f"FRED API Available: {FRED_API_AVAILABLE}")
+        print(f"DEBUG: In config page - ANALYTICS_AVAILABLE = {ANALYTICS_AVAILABLE}")
     
     # Data Source Information
     st.subheader("Data Sources")
