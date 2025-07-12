@@ -1,9 +1,3 @@
----
-tags:
-- FRED
-- ECONOMIC
-- ML
----
 # FRED ML - Federal Reserve Economic Data Machine Learning System
 
 A comprehensive Machine Learning system for analyzing Federal Reserve Economic Data (FRED) with automated data processing, advanced analytics, and interactive visualizations.
@@ -312,7 +306,7 @@ FRED API → AWS Lambda → S3 Storage → Streamlit Dashboard
 
 ## 📄 License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+This project is licensed under the APACHE 2 License.
 
 ## 🆘 Support
 
