@@ -436,16 +436,16 @@ def main():
         st.error("❌ FRED API key not configured. Please set FRED_API_KEY environment variable.")
         st.info("Get a free FRED API key at: https://fred.stlouisfed.org/docs/api/api_key.html")
         st.stop()
-        
-        # Force analytics to be available if loading succeeded
-        if ANALYTICS_AVAILABLE:
-            print("DEBUG: Analytics loaded successfully in main function")
-        else:
-            print("DEBUG: Analytics failed to load in main function")
-        
-        # Initialize AWS clients
-        s3_client, lambda_client = init_aws_clients()
-        config = load_app_config()
+    
+    # Initialize AWS clients and config for real data mode
+    s3_client, lambda_client = init_aws_clients()
+    config = load_app_config()
+    
+    # Force analytics to be available if loading succeeded
+    if ANALYTICS_AVAILABLE:
+        print("DEBUG: Analytics loaded successfully in main function")
+    else:
+        print("DEBUG: Analytics failed to load in main function")
     
     # Show data mode info
     print(f"DEBUG: REAL_DATA_MODE = {REAL_DATA_MODE}")
