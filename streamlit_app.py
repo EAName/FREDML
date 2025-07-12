@@ -6,6 +6,20 @@ Streamlit Cloud Deployment Entry Point
 
 import sys
 import os
+import streamlit as st
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
+
+# Check for FRED API key
+fred_key = os.getenv("FRED_API_KEY") or st.secrets.get("FRED_API_KEY")
+if not fred_key:
+    st.error("❌ FRED API not available. Please configure your FRED API key.")
+    st.stop()
+
+# Add debug print
+st.write(f"🔑 FRED API Key loaded: {fred_key[:8]}...")
 
 # Add the frontend directory to the path
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -32,7 +46,6 @@ except ImportError as e:
     except ImportError as e2:
         print(f"Error importing from app: {e2}")
         # Last resort: define a simple main function
-        import streamlit as st
         def main():
             st.error("Failed to import main application. Please check the deployment.")
             st.info("Contact support if this issue persists.")
@@ -43,6 +56,5 @@ if __name__ == "__main__":
     if main is not None:
         main()
     else:
-        import streamlit as st
         st.error("Failed to import main application. Please check the deployment.")
         st.info("Contact support if this issue persists.") 
