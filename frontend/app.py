@@ -10,8 +10,6 @@ import os
 import sys
 import io
 from typing import Dict, List, Optional
-from dotenv import load_dotenv
-load_dotenv()
 
 import os
 print("DEBUG: FRED_API_KEY from os.getenv =", os.getenv('FRED_API_KEY'))
@@ -92,7 +90,7 @@ def load_config():
     print(f"DEBUG: load_config() - FRED_API_KEY from os.getenv = {fred_key}")
     if not fred_key:
         try:
-            fred_key = st.secrets.get("FRED_API_KEY")
+            fred_key = st.secrets["FRED_API_KEY"]
             print(f"DEBUG: load_config() - FRED_API_KEY from st.secrets = {fred_key}")
         except Exception as e:
             print(f"DEBUG: load_config() - Error getting from st.secrets: {e}")
