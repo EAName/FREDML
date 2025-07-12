@@ -67,8 +67,8 @@ def load_analytics():
         print(f"DEBUG: Analytics loading failed: {e}, ANALYTICS_AVAILABLE = {ANALYTICS_AVAILABLE}")
         return False
 
-# Get FRED API key from environment
-FRED_API_KEY = os.getenv('FRED_API_KEY', '')
+# Get FRED API key from environment (will be updated by load_config())
+FRED_API_KEY = ''
 
 # Lazy import FRED API client
 def load_fred_client():
@@ -97,18 +97,20 @@ def load_config():
     
     print("DEBUG: Final FRED_API_KEY =", fred_key)
     
+    # Update global variables
+    FRED_API_KEY = fred_key or ''
+    REAL_DATA_MODE = FRED_API_KEY and FRED_API_KEY != 'your-fred-api-key-here'
+    
     try:
         from config import Config
         CONFIG_AVAILABLE = True
         if not fred_key:
             fred_key = Config.get_fred_api_key()
-        FRED_API_KEY = fred_key
-        REAL_DATA_MODE = Config.validate_fred_api_key() if fred_key else False
+            FRED_API_KEY = fred_key
+            REAL_DATA_MODE = Config.validate_fred_api_key() if fred_key else False
         return True
     except ImportError:
         CONFIG_AVAILABLE = False
-        FRED_API_KEY = fred_key
-        REAL_DATA_MODE = FRED_API_KEY and FRED_API_KEY != 'your-fred-api-key-here'
         return False
 
 # Custom CSS for enterprise styling
