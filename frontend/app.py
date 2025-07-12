@@ -85,7 +85,7 @@ def load_fred_client():
 # Lazy import configuration
 def load_config():
     """Load configuration only when needed"""
-    global CONFIG_AVAILABLE, FRED_API_KEY, REAL_DATA_MODE
+    global CONFIG_AVAILABLE, FRED_API_KEY, REAL_DATA_MODE, FRED_API_AVAILABLE
     
     # Try multiple sources for FRED API key
     fred_key = os.getenv('FRED_API_KEY')
@@ -103,8 +103,11 @@ def load_config():
     # Update global variables
     FRED_API_KEY = fred_key or ''
     REAL_DATA_MODE = FRED_API_KEY and FRED_API_KEY != 'your-fred-api-key-here'
+    # Now that we know the key exists, mark the API client as available
+    FRED_API_AVAILABLE = bool(REAL_DATA_MODE)
     print(f"DEBUG: load_config() - Updated FRED_API_KEY = {FRED_API_KEY}")
     print(f"DEBUG: load_config() - Updated REAL_DATA_MODE = {REAL_DATA_MODE}")
+    print(f"DEBUG: load_config() - Updated FRED_API_AVAILABLE = {FRED_API_AVAILABLE}")
     
     try:
         from config import Config
