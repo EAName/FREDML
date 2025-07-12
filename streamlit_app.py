@@ -4,46 +4,23 @@ import os, sys
 import streamlit as st
 from dotenv import load_dotenv
 
-# 1) Load .env (locally) and merge in Streamlit secrets
-load_dotenv()  # Local .env, no-op on Cloud
+# 1. Load .env locally (no‐op in Cloud)…
+load_dotenv()
 
-st.write("🌱 os.environ keys with 'FRED': ", [k for k in os.environ if "FRED" in k])
-st.write("🌱 st.secrets keys: ", list(st.secrets.keys()))
+# 2. Grab the key from env OR Cloud secrets
+fred_key = os.getenv("FRED_API_KEY") or st.secrets.get("FRED_API_KEY")
+if not fred_key:
+    st.error("❌ FRED API not available. Please configure your FRED_API_KEY.")
+    st.stop()
 
-# Now fetch the key from both places
-env_key = os.getenv("FRED_API_KEY")
-secrets_key = st.secrets.get("FRED_API_KEY")
-st.write("🌱 os.getenv FRED_API_KEY:", env_key or "‹None›")
-st.write("🌱 st.secrets FRED_API_KEY:", secrets_key or "‹None›")
+# 3. Propagate it into the actual env & secret namespace  
+os.environ["FRED_API_KEY"] = fred_key
+st.secrets["FRED_API_KEY"] = fred_key  # so any direct st.secrets lookup also works
 
-# Test FRED API call if we have a key
-fred_key = env_key or secrets_key
-if fred_key:
-    try:
-        from fredapi import Fred
-        fred = Fred(api_key=fred_key)
-        
-        # Quick sanity check:
-        pts = fred.get_series("GDP", observation_start="2020-01-01", observation_end="2020-01-01")
-        st.write("✅ Fetched test point:", pts.iloc[0])
-        st.success("🎉 FRED API connection successful!")
-        
-        # If we get here, the API works - let's try the real app
-        st.write("🚀 Attempting to load real app...")
-        
-        # 2) Ensure our code is importable
-        HERE = os.path.dirname(os.path.abspath(__file__))
-        sys.path.insert(0, os.path.join(HERE, "frontend"))
-        sys.path.insert(0, HERE)
-        
-        # 3) Import and run your real app
-        from frontend.app import main as app_main
-        app_main()
-        
-    except Exception as e:
-        st.error(f"🚨 fredapi call failed: {e}")
-        st.stop()
-else:
-    st.error("❌ No FRED API key found in environment or secrets")
-    st.info("Please configure FRED_API_KEY in Streamlit Cloud secrets")
-    st.stop() 
+# 4. Now hook up your frontend code
+HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, os.path.join(HERE, "frontend"))
+from app import main as app_main
+
+# Call the main function directly for Streamlit Cloud
+app_main() 
