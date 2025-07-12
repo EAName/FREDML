@@ -336,7 +336,7 @@ def create_forecast_plot(historical_data, forecast_data, title="Forecast"):
         forecast_index = pd.date_range(
             start=historical_data.index[-1] + pd.DateOffset(months=3),
             periods=len(forecast_values),
-            freq='Q'
+            freq='QE'
         )
         
         fig.add_trace(go.Scatter(
@@ -781,7 +781,7 @@ def show_advanced_analytics_page(s3_client, config):
                             # Create sample DataFrame for visualization
                             import pandas as pd
                             import numpy as np
-                            dates = pd.date_range('2020-01-01', periods=50, freq='M')
+                            dates = pd.date_range('2020-01-01', periods=50, freq='ME')
                             sample_data = pd.DataFrame({
                                 'GDPC1': np.random.normal(100, 10, 50),
                                 'INDPRO': np.random.normal(50, 5, 50),

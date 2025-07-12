@@ -14,7 +14,7 @@ if frontend_dir not in sys.path:
     sys.path.insert(0, frontend_dir)
 
 # Import and run the main app
-from app import main
+import app
 
-if __name__ == "__main__":
-    main() 
+# The app.py file already has the main() function and runs it when __name__ == "__main__"
+# We just need to import it to trigger the Streamlit app 
