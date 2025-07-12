@@ -112,7 +112,16 @@ FRED_ML/
    export FRED_API_KEY="your_fred_api_key"
    ```
 
-4. **Run the interactive demo**
+4. **Set up FRED API (Optional but Recommended)**
+   ```bash
+   # Run setup wizard
+   python frontend/setup_fred.py
+   
+   # Test your FRED API key
+   python frontend/test_fred_api.py
+   ```
+
+5. **Run the interactive demo**
    ```bash
    streamlit run scripts/streamlit_demo.py
    ```
@@ -150,6 +159,20 @@ python scripts/dev_setup.py
 
 # Run development tests
 python scripts/run_dev_tests.py
+```
+
+### Streamlit Cloud Deployment (Free)
+```bash
+# 1. Push to GitHub
+git add .
+git commit -m "Prepare for Streamlit Cloud deployment"
+git push origin main
+
+# 2. Deploy to Streamlit Cloud
+# Go to https://share.streamlit.io/
+# Connect your GitHub repository
+# Set main file path to: streamlit_app.py
+# Add environment variables for FRED_API_KEY and AWS credentials
 ```
 
 ### Production Deployment
@@ -193,11 +216,29 @@ python scripts/run_advanced_analytics.py \
 
 ## 🔧 Configuration
 
+### Real vs Demo Data
+
+The application supports two modes:
+
+#### 🎯 Real FRED Data (Recommended)
+- **Requires**: Free FRED API key from https://fred.stlouisfed.org/docs/api/api_key.html
+- **Features**: Live economic data, real-time insights, actual forecasts
+- **Setup**: 
+  ```bash
+  export FRED_API_KEY="your-actual-api-key"
+  python frontend/test_fred_api.py  # Test your key
+  ```
+
+#### 📊 Demo Data (Fallback)
+- **Features**: Realistic economic data for demonstration
+- **Use case**: When API key is not available or for testing
+- **Data**: Generated based on historical patterns and economic principles
+
 ### Environment Variables
 - `AWS_ACCESS_KEY_ID`: AWS access key
 - `AWS_SECRET_ACCESS_KEY`: AWS secret key
 - `AWS_DEFAULT_REGION`: AWS region (default: us-east-1)
-- `FRED_API_KEY`: FRED API key
+- `FRED_API_KEY`: FRED API key (get free key from FRED website)
 
 ### Configuration Files
 - `config/pipeline.yaml`: Pipeline configuration
