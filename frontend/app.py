@@ -71,13 +71,10 @@ FRED_API_KEY = ''
 # Lazy import FRED API client
 def load_fred_client():
     """Load FRED API client only when needed"""
-    global FRED_API_AVAILABLE
     try:
         from frontend.fred_api_client import get_real_economic_data, generate_real_insights
-        FRED_API_AVAILABLE = True
         return True
     except ImportError:
-        FRED_API_AVAILABLE = False
         return False
 
 # Lazy import configuration
@@ -98,7 +95,7 @@ def load_config():
     REAL_DATA_MODE = bool(FRED_API_KEY and FRED_API_KEY != "your-fred-api-key-here")
     FRED_API_AVAILABLE = REAL_DATA_MODE  # ensure downstream checks pass
 
-    print(f"DEBUG load_config ▶ FRED_API_KEY={FRED_API_KEY}, REAL_DATA_MODE={REAL_DATA_MODE}, FRED_API_AVAILABLE={FRED_API_AVAILABLE}")
+    print(f"DEBUG load_config ▶ FRED_API_KEY={FRED_API_KEY!r}, REAL_DATA_MODE={REAL_DATA_MODE}, FRED_API_AVAILABLE={FRED_API_AVAILABLE}")
 
     # 4) Optionally load additional Config class if you have one
     try:
