@@ -306,7 +306,7 @@ FRED API → AWS Lambda → S3 Storage → Streamlit Dashboard
 
 ## 📄 License
 
-This project is licensed under the APACHE 2 License.
+This project is licensed under the Apache 2.0 License.
 
 ## 🆘 Support
 
