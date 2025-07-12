@@ -1,8 +1,16 @@
 #!/usr/bin/env python3
-"""Diagnostic wrapper to verify Streamlit secrets."""
-import os, streamlit as st
+"""Streamlit-native entry point for Streamlit Cloud deployment."""
+import streamlit as st, os
 
-st.write("🔑 os.environ:", {k: v for k, v in os.environ.items() if "FRED" in k})
-st.write("🔑 st.secrets:", list(st.secrets.keys()))
-st.write("🔑 st.secrets FRED_API_KEY:", st.secrets.get("FRED_API_KEY", "NOT_FOUND"))
-st.stop() 
+# **no** load_dotenv() here
+fred_key = st.secrets["FRED_API_KEY"]
+if not fred_key:
+    st.error("❌ FRED API key not found in Streamlit secrets.")
+    st.stop()
+
+# make it available to downstream code
+os.environ["FRED_API_KEY"] = fred_key
+
+# now import and run your real app
+from frontend.app import main as app_main
+app_main() 
