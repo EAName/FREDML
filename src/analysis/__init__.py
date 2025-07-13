@@ -2,6 +2,7 @@
 Economic data analysis and visualization tools.
 """
 
-from .advanced_analytics import AdvancedAnalytics
+# Don't import anything here to avoid circular imports
+# Modules should be imported directly when needed
 
-__all__ = ["AdvancedAnalytics"]
+__all__ = []

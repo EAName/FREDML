@@ -58,6 +58,11 @@ ANALYSIS_TYPES = {
     'statistical': 'Statistical Modeling'
 }
 
+class Config:
+    @staticmethod
+    def get_fred_api_key():
+        return FRED_API_KEY
+
 def get_aws_config() -> dict:
     """Get AWS configuration with proper fallbacks"""
     config = {

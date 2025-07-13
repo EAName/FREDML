@@ -12,10 +12,7 @@ __version__ = "1.0.0"
 __author__ = "Economic Data Team"
 __email__ = "data-team@company.com"
 
-from .analysis.advanced_analytics import AdvancedAnalytics
-from .core.fred_client import FREDDataCollectorV2
+# Don't import anything here to avoid circular imports
+# Modules should be imported directly when needed
 
-__all__ = [
-    "FREDDataCollectorV2",
-    "AdvancedAnalytics",
-]
+__all__ = []

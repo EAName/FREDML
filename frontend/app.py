@@ -599,6 +599,12 @@ def show_executive_dashboard(s3_client, config):
     </div>
     """, unsafe_allow_html=True)
     
+    # Show analytics status
+    if ANALYTICS_AVAILABLE:
+        st.success("✅ Advanced Analytics Available - Using Comprehensive Economic Modeling")
+    else:
+        st.warning("⚠️ Advanced Analytics Not Available - Using Basic Analysis")
+    
     # Get latest report
     if s3_client is not None:
         reports = get_available_reports(s3_client, config['s3_bucket'])
@@ -741,8 +747,27 @@ def show_advanced_analytics_page(s3_client, config):
                     import time
                     time.sleep(2)  # Simulate processing time
                     
-                    # Generate analysis results based on selected type
-                    real_results = generate_analysis_results(analysis_type, real_data, selected_indicators)
+                    # Use the ComprehensiveAnalytics class for real analysis
+                    if ANALYTICS_AVAILABLE:
+                        try:
+                            from src.analysis.comprehensive_analytics import ComprehensiveAnalytics
+                            analytics = ComprehensiveAnalytics(FRED_API_KEY, output_dir="data/exports")
+                            
+                            # Run the comprehensive analysis
+                            real_results = analytics.run_complete_analysis(
+                                indicators=selected_indicators,
+                                start_date=start_date_input.strftime('%Y-%m-%d'),
+                                end_date=end_date_input.strftime('%Y-%m-%d'),
+                                forecast_periods=forecast_periods,
+                                include_visualizations=include_visualizations
+                            )
+                        except Exception as e:
+                            st.error(f"❌ Comprehensive analytics failed: {e}")
+                            # Fallback to basic analysis
+                            real_results = generate_analysis_results(analysis_type, real_data, selected_indicators)
+                    else:
+                        # Fallback to basic analysis if analytics not available
+                        real_results = generate_analysis_results(analysis_type, real_data, selected_indicators)
                     
                     st.success(f"✅ Real FRED data {analysis_type.lower()} analysis completed successfully!")
                     
