@@ -2,6 +2,14 @@
 """
 FRED ML - Enterprise Economic Analytics Platform
 Professional think tank interface for comprehensive economic data analysis
+
+VERSION: 2.0.1 - Latest Updates Applied
+- Fixed string/int comparison errors
+- Removed debug language from insights  
+- Fixed S3 credentials issues
+- Updated downloads section
+- Apache 2.0 license
+- Comprehensive README
 """
 
 import streamlit as st
@@ -17,7 +25,7 @@ print("DEBUG: FRED_API_KEY from shell =", os.environ.get('FRED_API_KEY'))
 
 # Page configuration - MUST be first Streamlit command
 st.set_page_config(
-    page_title="FRED ML - Economic Analytics Platform",
+    page_title="FRED ML - Economic Analytics Platform v2.0.1",
     page_icon="🏛️",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -423,6 +431,14 @@ def create_forecast_plot(historical_data, forecast_data, title="Forecast"):
 
 def main():
     """Main Streamlit application"""
+    
+    # Display version info
+    st.markdown("""
+    <div style="background: linear-gradient(90deg, #1e3c72 0%, #2a5298 100%); 
+                color: white; padding: 0.5rem; border-radius: 5px; margin-bottom: 1rem; text-align: center;">
+        <strong>FRED ML v2.0.1</strong> - Latest Updates Applied ✅
+    </div>
+    """, unsafe_allow_html=True)
     
     # Show loading indicator and load everything
     with st.spinner("🚀 Initializing FRED ML Platform..."):
