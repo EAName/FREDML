@@ -1545,4 +1545,4 @@ def show_configuration_page(config):
         """)
 
 if __name__ == "__main__":
-    main() 
+    main() # Updated for Streamlit Cloud deployment
