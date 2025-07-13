@@ -1,0 +1,89 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'EventBridge Rule for Quarterly FRED ML Analysis'
+
+Parameters:
+  LambdaFunctionName:
+    Type: String
+    Default: fred-ml-processor
+    Description: Name of the Lambda function to invoke
+  
+  S3BucketName:
+    Type: String
+    Default: fredmlv1
+    Description: S3 bucket for storing reports
+
+Resources:
+  # EventBridge Rule for Quarterly Analysis
+  QuarterlyAnalysisRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Name: quarterly-fred-ml-analysis
+      Description: Triggers FRED ML analysis every quarter
+      ScheduleExpression: cron(0 0 1 */3 ? *)  # First day of every quarter at midnight UTC
+      State: ENABLED
+      Targets:
+        - Arn: !GetAtt FredMLLambdaFunction.Arn
+          Id: FredMLLambdaTarget
+          Input: !Sub |
+            {
+              "indicators": ["GDP", "UNRATE", "CPIAUCSL", "FEDFUNDS", "DGS10"],
+              "start_date": "2020-01-01",
+              "end_date": "2024-12-31",
+              "options": {
+                "visualizations": true,
+                "correlation": true,
+                "forecasting": false,
+                "statistics": true
+              }
+            }
+
+  # Lambda Permission for EventBridge
+  LambdaPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref LambdaFunctionName
+      Action: lambda:InvokeFunction
+      Principal: events.amazonaws.com
+      SourceArn: !GetAtt QuarterlyAnalysisRule.Arn
+
+  # IAM Role for Lambda
+  LambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: fred-ml-lambda-role
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: FredMLLambdaPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:GetObject
+                  - s3:PutObject
+                  - s3:DeleteObject
+                  - s3:ListBucket
+                Resource:
+                  - !Sub 'arn:aws:s3:::${S3BucketName}'
+                  - !Sub 'arn:aws:s3:::${S3BucketName}/*'
+
+Outputs:
+  QuarterlyAnalysisRuleArn:
+    Description: ARN of the quarterly analysis rule
+    Value: !GetAtt QuarterlyAnalysisRule.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-QuarterlyAnalysisRuleArn'
+  
+  LambdaExecutionRoleArn:
+    Description: ARN of the Lambda execution role
+    Value: !GetAtt LambdaExecutionRole.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-LambdaExecutionRoleArn' 

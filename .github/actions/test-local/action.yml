@@ -1,0 +1,78 @@
+name: 'Local Testing Action'
+description: 'Reusable action for running local tests'
+
+inputs:
+  test-type:
+    description: 'Type of test to run'
+    required: true
+    default: 'all'
+  python-version:
+    description: 'Python version to use'
+    required: false
+    default: '3.9'
+  aws-region:
+    description: 'AWS region for testing'
+    required: false
+    default: 'us-west-2'
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Set up Python ${{ inputs.python-version }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ inputs.python-version }}
+        
+    - name: Install dependencies
+      shell: bash
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install pytest pytest-cov black flake8 mypy
+        
+    - name: Run tests
+      shell: bash
+      run: |
+        case "${{ inputs.test-type }}" in
+          "unit")
+            echo "🧪 Running unit tests..."
+            pytest tests/unit/ -v --cov=lambda --cov=frontend --cov-report=xml
+            ;;
+          "integration")
+            echo "🔗 Running integration tests..."
+            python scripts/test_complete_system.py --skip-e2e
+            ;;
+          "e2e")
+            echo "🚀 Running end-to-end tests..."
+            python scripts/test_complete_system.py
+            ;;
+          "quality")
+            echo "🔍 Running quality checks..."
+            black --check --diff .
+            flake8 . --count --exit-zero --max-complexity=10 --max-line-length=88
+            mypy lambda/ frontend/ src/ --ignore-missing-imports
+            ;;
+          "security")
+            echo "🔒 Running security scan..."
+            pip install bandit
+            bandit -r lambda/ frontend/ src/ -f json -o bandit-report.json || true
+            ;;
+          "all")
+            echo "🧪 Running all tests..."
+            pytest tests/unit/ -v --cov=lambda --cov=frontend --cov-report=xml
+            python scripts/test_complete_system.py
+            black --check --diff .
+            flake8 . --count --exit-zero --max-complexity=10 --max-line-length=88
+            mypy lambda/ frontend/ src/ --ignore-missing-imports
+            pip install bandit
+            bandit -r lambda/ frontend/ src/ -f json -o bandit-report.json || true
+            ;;
+          *)
+            echo "❌ Unknown test type: ${{ inputs.test-type }}"
+            exit 1
+            ;;
+        esac
+      env:
+        AWS_DEFAULT_REGION: ${{ inputs.aws-region }}
+        S3_BUCKET: fredmlv1
+        LAMBDA_FUNCTION: fred-ml-processor 

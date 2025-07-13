@@ -1,0 +1,54 @@
+================================================================================
+ECONOMIC INDICATORS ALIGNMENT & DEVIATION ANALYSIS REPORT
+================================================================================
+
+📊 LONG-TERM ALIGNMENT ANALYSIS
+----------------------------------------
+• Increasing Alignment Pairs: 79
+• Decreasing Alignment Pairs: 89
+• Stable Alignment Pairs: 30
+• Strong Trends: 58
+
+🔺 Pairs with Increasing Alignment:
+  - GDPC1_vs_INDPRO
+  - GDPC1_vs_INDPRO
+  - GDPC1_vs_INDPRO
+  - GDPC1_vs_TCU
+  - GDPC1_vs_TCU
+
+🔻 Pairs with Decreasing Alignment:
+  - GDPC1_vs_RSAFS
+  - GDPC1_vs_RSAFS
+  - GDPC1_vs_RSAFS
+  - GDPC1_vs_PAYEMS
+  - GDPC1_vs_CPIAUCSL
+
+⚠️ SUDDEN DEVIATION ANALYSIS
+-----------------------------------
+• Total Deviations Detected: 61
+• Indicators with Deviations: 12
+• Extreme Events: 61
+
+📈 Most Volatile Indicators:
+  - FEDFUNDS: 0.6602 volatility
+  - DGS10: 0.1080 volatility
+  - UNRATE: 0.0408 volatility
+  - DEXUSEU: 0.0162 volatility
+  - RSAFS: 0.0161 volatility
+
+🚨 Recent Extreme Events:
+  - GDPC1: 2022-07-01 (Z-score: 2.95)
+  - INDPRO: 2022-12-31 (Z-score: -2.95)
+  - RSAFS: 2024-09-30 (Z-score: 3.07)
+  - TCU: 2022-12-31 (Z-score: -3.16)
+  - PAYEMS: 2024-12-31 (Z-score: 2.29)
+  - CPIAUCSL: 2021-06-30 (Z-score: 2.70)
+  - PCE: 2023-01-01 (Z-score: 2.47)
+  - FEDFUNDS: 2024-09-30 (Z-score: -3.18)
+  - DGS10: 2023-09-30 (Z-score: 3.04)
+  - M2SL: 2024-03-31 (Z-score: 3.04)
+  - DEXUSEU: 2021-09-30 (Z-score: -2.91)
+  - UNRATE: 2023-09-30 (Z-score: 3.09)
+
+================================================================================
+Analysis completed successfully.

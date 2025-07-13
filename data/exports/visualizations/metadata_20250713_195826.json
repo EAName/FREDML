@@ -1,0 +1,13 @@
+{
+  "analysis_type": "comprehensive",
+  "timestamp": "2025-07-13T19:58:26.154966",
+  "charts_generated": [
+    "time_series",
+    "correlation",
+    "distributions",
+    "pca",
+    "clustering",
+    "forecast"
+  ],
+  "output_dir": "/workspaces/FRED_ML/data/exports/visualizations"
+}
