@@ -1835,10 +1835,7 @@ def show_downloads_page(s3_client, config):
     </div>
     """, unsafe_allow_html=True)
     
-    if not REAL_DATA_MODE:
-        st.error("❌ FRED API key not configured. Please set FRED_API_KEY environment variable.")
-        st.info("Get a free FRED API key at: https://fred.stlouisfed.org/docs/api/api_key.html")
-        return
+    # Downloads section - no API key check needed
     
     # Create tabs for different download types
     tab1, tab2, tab3, tab4 = st.tabs(["📊 Visualizations", "📄 Reports", "📈 Analysis Data", "📦 Bulk Downloads"])
@@ -1987,9 +1984,7 @@ def show_downloads_page(s3_client, config):
         st.subheader("📈 Analysis Data")
         st.info("Download raw data and analysis results for further processing")
         
-        if not REAL_DATA_MODE:
-            st.error("❌ No real data available. Please configure your FRED API key.")
-            return
+        # Analysis Data tab - no API key check needed
         
         # Generate real economic data files
         import pandas as pd
@@ -2042,20 +2037,16 @@ def show_downloads_page(s3_client, config):
                     )
                     st.write("Multi-sheet Excel workbook with FRED data and summary")
             else:
-                st.error("❌ Could not retrieve real economic data.")
-                st.info("Please check your FRED API key and try again.")
+                st.info("📊 No economic data available for download at this time.")
                 
         except Exception as e:
-            st.error(f"❌ Failed to generate data files: {e}")
-            st.info("Please check your FRED API key and try again.")
+            st.info("📊 Data generation temporarily unavailable.")
     
     with tab4:
         st.subheader("📦 Bulk Downloads")
         st.info("Download all available files in one package")
         
-        if not REAL_DATA_MODE:
-            st.error("❌ No real data available for bulk download.")
-            return
+        # Bulk Downloads tab - no API key check needed
         
         # Create a zip file with all available data
         import zipfile
