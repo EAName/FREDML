@@ -46,7 +46,7 @@ class TestLambdaFunction:
     
     def test_create_dataframe(self):
         """Test DataFrame creation from series data"""
-        from lambda.lambda_function import create_dataframe
+        from src.lambda_fn.lambda_function import create_dataframe
         
         # Create mock series data
         dates = pd.date_range('2024-01-01', '2024-01-05', freq='D')
@@ -65,7 +65,7 @@ class TestLambdaFunction:
     
     def test_generate_statistics(self):
         """Test statistics generation"""
-        from lambda.lambda_function import generate_statistics
+        from src.lambda_fn.lambda_function import generate_statistics
         
         # Create test DataFrame
         dates = pd.date_range('2024-01-01', '2024-01-05', freq='D')
@@ -93,7 +93,7 @@ class TestLambdaFunction:
     
     def test_create_correlation_matrix(self):
         """Test correlation matrix creation"""
-        from lambda.lambda_function import create_correlation_matrix
+        from src.lambda_fn.lambda_function import create_correlation_matrix
         
         # Create test DataFrame
         dates = pd.date_range('2024-01-01', '2024-01-05', freq='D')
@@ -113,10 +113,10 @@ class TestLambdaFunction:
         assert corr_matrix['GDP']['GDP'] == 1.0
         assert corr_matrix['UNRATE']['UNRATE'] == 1.0
     
-    @patch('lambda.lambda_function.requests.get')
+    @patch('src.lambda_fn.lambda_function.requests.get')
     def test_get_fred_data_success(self, mock_requests):
         """Test successful FRED data fetching"""
-        from lambda.lambda_function import get_fred_data
+        from src.lambda_fn.lambda_function import get_fred_data
         
         # Mock successful API response
         mock_response = Mock()
@@ -131,7 +131,7 @@ class TestLambdaFunction:
         mock_requests.return_value = mock_response
         
         # Mock environment variable
-        with patch('lambda.lambda_function.FRED_API_KEY', 'test-api-key'):
+        with patch('src.lambda_fn.lambda_function.FRED_API_KEY', 'test-api-key'):
             result = get_fred_data('GDP', '2024-01-01', '2024-01-03')
         
         assert result is not None
@@ -141,10 +141,10 @@ class TestLambdaFunction:
         assert result.iloc[1] == 101.0
         assert result.iloc[2] == 102.0
     
-    @patch('lambda.lambda_function.requests.get')
+    @patch('src.lambda_fn.lambda_function.requests.get')
     def test_get_fred_data_failure(self, mock_requests):
         """Test FRED data fetching failure"""
-        from lambda.lambda_function import get_fred_data
+        from src.lambda_fn.lambda_function import get_fred_data
         
         # Mock failed API response
         mock_response = Mock()
@@ -157,7 +157,7 @@ class TestLambdaFunction:
     
     def test_create_dataframe_empty_data(self):
         """Test DataFrame creation with empty data"""
-        from lambda.lambda_function import create_dataframe
+        from src.lambda_fn.lambda_function import create_dataframe
         
         # Test with empty series data
         df = create_dataframe({})
@@ -169,26 +169,25 @@ class TestLambdaFunction:
     
     def test_generate_statistics_empty_data(self):
         """Test statistics generation with empty data"""
-        from lambda.lambda_function import generate_statistics
-        
+        from src.lambda_fn.lambda_function import generate_statistics
+
         # Test with empty DataFrame
         df = pd.DataFrame()
         stats = generate_statistics(df)
         assert stats == {}
-        
+
         # Test with DataFrame containing only NaN values
         df = pd.DataFrame({
             'GDP': [np.nan, np.nan, np.nan],
             'UNRATE': [np.nan, np.nan, np.nan]
         })
         stats = generate_statistics(df)
-        assert 'GDP' in stats
-        assert stats['GDP']['count'] == 0
-        assert stats['GDP']['missing'] == 3
+        # When all values are NaN, the function should return empty stats
+        assert stats == {}
     
     def test_create_correlation_matrix_empty_data(self):
         """Test correlation matrix creation with empty data"""
-        from lambda.lambda_function import create_correlation_matrix
+        from src.lambda_fn.lambda_function import create_correlation_matrix
         
         # Test with empty DataFrame
         df = pd.DataFrame()

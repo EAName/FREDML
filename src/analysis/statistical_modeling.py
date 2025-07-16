@@ -98,67 +98,70 @@ class StatisticalModeling:
         Returns:
             Dictionary with model results and diagnostics
         """
-        # Prepare data
-        features_df, target_series = self.prepare_regression_data(target, predictors, lag_periods)
-        
-        if include_interactions:
-            # Add interaction terms
-            interaction_features = []
-            feature_cols = features_df.columns.tolist()
+        try:
+            # Prepare data
+            features_df, target_series = self.prepare_regression_data(target, predictors, lag_periods)
             
-            for i, col1 in enumerate(feature_cols):
-                for col2 in feature_cols[i+1:]:
-                    interaction_name = f"{col1}_x_{col2}"
-                    interaction_features.append(features_df[col1] * features_df[col2])
-                    features_df[interaction_name] = interaction_features[-1]
-        
-        # Scale features
-        scaler = StandardScaler()
-        features_scaled = scaler.fit_transform(features_df)
-        features_scaled_df = pd.DataFrame(features_scaled, 
-                                        index=features_df.index, 
-                                        columns=features_df.columns)
-        
-        # Fit model
-        model = LinearRegression()
-        model.fit(features_scaled_df, target_series)
-        
-        # Predictions
-        predictions = model.predict(features_scaled_df)
-        residuals = target_series - predictions
-        
-        # Model performance
-        r2 = r2_score(target_series, predictions)
-        mse = mean_squared_error(target_series, predictions)
-        rmse = np.sqrt(mse)
-        
-        # Coefficient analysis
-        coefficients = pd.DataFrame({
-            'variable': features_df.columns,
-            'coefficient': model.coef_,
-            'abs_coefficient': np.abs(model.coef_)
-        }).sort_values('abs_coefficient', ascending=False)
-        
-        # Diagnostic tests
-        diagnostics = self.perform_regression_diagnostics(features_scaled_df, target_series, 
-                                                        predictions, residuals)
-        
-        return {
-            'model': model,
-            'scaler': scaler,
-            'features': features_df,
-            'target': target_series,
-            'predictions': predictions,
-            'residuals': residuals,
-            'coefficients': coefficients,
-            'performance': {
-                'r2': r2,
-                'mse': mse,
-                'rmse': rmse,
-                'mae': np.mean(np.abs(residuals))
-            },
-            'diagnostics': diagnostics
-        }
+            if include_interactions:
+                # Add interaction terms
+                interaction_features = []
+                feature_cols = features_df.columns.tolist()
+                
+                for i, col1 in enumerate(feature_cols):
+                    for col2 in feature_cols[i+1:]:
+                        interaction_name = f"{col1}_x_{col2}"
+                        interaction_features.append(features_df[col1] * features_df[col2])
+                        features_df[interaction_name] = interaction_features[-1]
+            
+            # Scale features
+            scaler = StandardScaler()
+            features_scaled = scaler.fit_transform(features_df)
+            features_scaled_df = pd.DataFrame(features_scaled, 
+                                            index=features_df.index, 
+                                            columns=features_df.columns)
+            
+            # Fit model
+            model = LinearRegression()
+            model.fit(features_scaled_df, target_series)
+            
+            # Predictions
+            predictions = model.predict(features_scaled_df)
+            residuals = target_series - predictions
+            
+            # Model performance
+            r2 = r2_score(target_series, predictions)
+            mse = mean_squared_error(target_series, predictions)
+            rmse = np.sqrt(mse)
+            
+            # Coefficient analysis
+            coefficients = pd.DataFrame({
+                'variable': features_df.columns,
+                'coefficient': model.coef_,
+                'abs_coefficient': np.abs(model.coef_)
+            }).sort_values('abs_coefficient', ascending=False)
+            
+            # Diagnostic tests
+            diagnostics = self.perform_regression_diagnostics(features_scaled_df, target_series, 
+                                                            predictions, residuals)
+            
+            return {
+                'model': model,
+                'scaler': scaler,
+                'features': features_df,
+                'target': target_series,
+                'predictions': predictions,
+                'residuals': residuals,
+                'coefficients': coefficients,
+                'performance': {
+                    'r2': r2,
+                    'mse': mse,
+                    'rmse': rmse,
+                    'mae': np.mean(np.abs(residuals))
+                },
+                'diagnostics': diagnostics
+            }
+        except Exception as e:
+            return {'error': f'Regression model fitting failed: {str(e)}'}
     
     def perform_regression_diagnostics(self, features: pd.DataFrame, target: pd.Series,
                                      predictions: np.ndarray, residuals: pd.Series) -> Dict:
@@ -178,88 +181,93 @@ class StatisticalModeling:
         
         # 1. Normality test (Shapiro-Wilk)
         try:
-            normality_stat, normality_p = stats.shapiro(residuals)
+            shapiro_stat, shapiro_p = stats.shapiro(residuals)
             diagnostics['normality'] = {
-                'statistic': normality_stat,
-                'p_value': normality_p,
-                'is_normal': normality_p > 0.05
+                'test': 'Shapiro-Wilk',
+                'statistic': shapiro_stat,
+                'p_value': shapiro_p,
+                'interpretation': self._interpret_normality(shapiro_p)
             }
-        except:
-            diagnostics['normality'] = {'error': 'Test failed'}
+        except Exception as e:
+            diagnostics['normality'] = {'error': str(e)}
         
         # 2. Homoscedasticity test (Breusch-Pagan)
         try:
             bp_stat, bp_p, bp_f, bp_f_p = het_breuschpagan(residuals, features)
             diagnostics['homoscedasticity'] = {
+                'test': 'Breusch-Pagan',
                 'statistic': bp_stat,
                 'p_value': bp_p,
-                'f_statistic': bp_f,
-                'f_p_value': bp_f_p,
-                'is_homoscedastic': bp_p > 0.05
+                'interpretation': self._interpret_homoscedasticity(bp_p)
             }
-        except:
-            diagnostics['homoscedasticity'] = {'error': 'Test failed'}
+        except Exception as e:
+            diagnostics['homoscedasticity'] = {'error': str(e)}
         
         # 3. Autocorrelation test (Durbin-Watson)
         try:
             dw_stat = durbin_watson(residuals)
             diagnostics['autocorrelation'] = {
+                'test': 'Durbin-Watson',
                 'statistic': dw_stat,
                 'interpretation': self._interpret_durbin_watson(dw_stat)
             }
-        except:
-            diagnostics['autocorrelation'] = {'error': 'Test failed'}
+        except Exception as e:
+            diagnostics['autocorrelation'] = {'error': str(e)}
         
-        # 4. Multicollinearity test (VIF)
+        # 4. Multicollinearity (VIF)
         try:
-            vif_scores = {}
-            for i, col in enumerate(features.columns):
+            vif_data = []
+            for i in range(features.shape[1]):
                 vif = variance_inflation_factor(features.values, i)
-                vif_scores[col] = vif
-            
+                vif_data.append({
+                    'variable': features.columns[i],
+                    'vif': vif
+                })
             diagnostics['multicollinearity'] = {
-                'vif_scores': vif_scores,
-                'high_vif_variables': [var for var, vif in vif_scores.items() if vif > 10],
-                'mean_vif': np.mean(list(vif_scores.values()))
+                'test': 'Variance Inflation Factor',
+                'vif_values': vif_data,
+                'interpretation': self._interpret_multicollinearity(vif_data)
             }
-        except:
-            diagnostics['multicollinearity'] = {'error': 'Test failed'}
-        
-        # 5. Stationarity tests
-        try:
-            # ADF test
-            adf_result = adfuller(target)
-            diagnostics['stationarity_adf'] = {
-                'statistic': adf_result[0],
-                'p_value': adf_result[1],
-                'is_stationary': adf_result[1] < 0.05
-            }
-            
-            # KPSS test
-            kpss_result = kpss(target, regression='c')
-            diagnostics['stationarity_kpss'] = {
-                'statistic': kpss_result[0],
-                'p_value': kpss_result[1],
-                'is_stationary': kpss_result[1] > 0.05
-            }
-        except:
-            diagnostics['stationarity'] = {'error': 'Test failed'}
+        except Exception as e:
+            diagnostics['multicollinearity'] = {'error': str(e)}
         
         return diagnostics
     
+    def _interpret_normality(self, p_value: float) -> str:
+        """Interpret normality test results"""
+        if p_value < 0.05:
+            return "Residuals are not normally distributed (p < 0.05)"
+        else:
+            return "Residuals appear to be normally distributed (p >= 0.05)"
+    
+    def _interpret_homoscedasticity(self, p_value: float) -> str:
+        """Interpret homoscedasticity test results"""
+        if p_value < 0.05:
+            return "Heteroscedasticity detected (p < 0.05)"
+        else:
+            return "Homoscedasticity assumption appears valid (p >= 0.05)"
+    
     def _interpret_durbin_watson(self, dw_stat: float) -> str:
-        """Interpret Durbin-Watson statistic"""
+        """Interpret Durbin-Watson test results"""
         if dw_stat < 1.5:
-            return "Positive autocorrelation"
+            return "Positive autocorrelation detected"
         elif dw_stat > 2.5:
-            return "Negative autocorrelation"
+            return "Negative autocorrelation detected"
         else:
             return "No significant autocorrelation"
+    
+    def _interpret_multicollinearity(self, vif_data: List[Dict]) -> str:
+        """Interpret multicollinearity test results"""
+        high_vif = [item for item in vif_data if item['vif'] > 10]
+        if high_vif:
+            return f"Multicollinearity detected in {len(high_vif)} variables"
+        else:
+            return "No significant multicollinearity detected"
     
     def analyze_correlations(self, indicators: List[str] = None, 
                            method: str = 'pearson') -> Dict:
         """
-        Perform comprehensive correlation analysis
+        Analyze correlations between economic indicators
         
         Args:
             indicators: List of indicators to analyze. If None, use all numeric columns
@@ -271,93 +279,107 @@ class StatisticalModeling:
         if indicators is None:
             indicators = self.data.select_dtypes(include=[np.number]).columns.tolist()
         
-        # Calculate growth rates
-        growth_data = self.data[indicators].pct_change().dropna()
+        # Calculate correlation matrix
+        corr_matrix = self.data[indicators].corr(method=method)
         
-        # Correlation matrix
-        corr_matrix = growth_data.corr(method=method)
-        
-        # Significant correlations
-        significant_correlations = []
-        for i in range(len(corr_matrix.columns)):
-            for j in range(i+1, len(corr_matrix.columns)):
-                var1 = corr_matrix.columns[i]
-                var2 = corr_matrix.columns[j]
+        # Find strongest correlations
+        corr_pairs = []
+        for i in range(len(indicators)):
+            for j in range(i+1, len(indicators)):
                 corr_value = corr_matrix.iloc[i, j]
-                
-                # Test significance
-                n = len(growth_data)
-                t_stat = corr_value * np.sqrt((n-2) / (1-corr_value**2))
-                p_value = 2 * (1 - stats.t.cdf(abs(t_stat), n-2))
-                
-                if p_value < 0.05:
-                    significant_correlations.append({
-                        'variable1': var1,
-                        'variable2': var2,
-                        'correlation': corr_value,
-                        'p_value': p_value,
-                        'strength': self._interpret_correlation_strength(abs(corr_value))
-                    })
+                corr_pairs.append({
+                    'variable1': indicators[i],
+                    'variable2': indicators[j],
+                    'correlation': corr_value,
+                    'strength': self._interpret_correlation_strength(corr_value)
+                })
         
-        # Sort by absolute correlation
-        significant_correlations.sort(key=lambda x: abs(x['correlation']), reverse=True)
-        
-        # Principal Component Analysis
-        try:
-            pca = self._perform_pca_analysis(growth_data)
-        except Exception as e:
-            logger.warning(f"PCA analysis failed: {e}")
-            pca = {'error': str(e)}
+        # Sort by absolute correlation value
+        corr_pairs.sort(key=lambda x: abs(x['correlation']), reverse=True)
         
         return {
             'correlation_matrix': corr_matrix,
-            'significant_correlations': significant_correlations,
+            'correlation_pairs': corr_pairs,
             'method': method,
-            'pca_analysis': pca
+            'strongest_correlations': corr_pairs[:5]
         }
     
     def _interpret_correlation_strength(self, corr_value: float) -> str:
         """Interpret correlation strength"""
-        if corr_value >= 0.8:
-            return "Very Strong"
-        elif corr_value >= 0.6:
+        abs_corr = abs(corr_value)
+        if abs_corr >= 0.8:
+            return "Very strong"
+        elif abs_corr >= 0.6:
             return "Strong"
-        elif corr_value >= 0.4:
+        elif abs_corr >= 0.4:
             return "Moderate"
-        elif corr_value >= 0.2:
+        elif abs_corr >= 0.2:
             return "Weak"
         else:
-            return "Very Weak"
+            return "Very weak"
+    
+    def perform_stationarity_tests(self, series: pd.Series) -> Dict:
+        """
+        Perform stationarity tests on time series data
+        
+        Args:
+            series: Time series data
+            
+        Returns:
+            Dictionary with stationarity test results
+        """
+        results = {}
+        
+        # ADF test
+        try:
+            adf_stat, adf_p, adf_critical = adfuller(series.dropna())
+            results['adf'] = {
+                'statistic': adf_stat,
+                'p_value': adf_p,
+                'critical_values': adf_critical,
+                'is_stationary': adf_p < 0.05
+            }
+        except Exception as e:
+            results['adf'] = {'error': str(e)}
+        
+        # KPSS test
+        try:
+            kpss_stat, kpss_p, kpss_critical = kpss(series.dropna())
+            results['kpss'] = {
+                'statistic': kpss_stat,
+                'p_value': kpss_p,
+                'critical_values': kpss_critical,
+                'is_stationary': kpss_p >= 0.05
+            }
+        except Exception as e:
+            results['kpss'] = {'error': str(e)}
+        
+        return results
     
     def _perform_pca_analysis(self, data: pd.DataFrame) -> Dict:
-        """Perform Principal Component Analysis"""
+        """
+        Perform Principal Component Analysis
+        
+        Args:
+            data: Standardized data matrix
+            
+        Returns:
+            Dictionary with PCA results
+        """
         from sklearn.decomposition import PCA
         
-        # Standardize data
-        scaler = StandardScaler()
-        data_scaled = scaler.fit_transform(data)
-        
-        # Perform PCA
         pca = PCA()
-        pca_result = pca.fit_transform(data_scaled)
+        pca.fit(data)
         
         # Explained variance
         explained_variance = pca.explained_variance_ratio_
         cumulative_variance = np.cumsum(explained_variance)
         
-        # Component loadings
-        loadings = pd.DataFrame(
-            pca.components_.T,
-            columns=[f'PC{i+1}' for i in range(pca.n_components_)],
-            index=data.columns
-        )
-        
         return {
+            'components': pca.components_,
             'explained_variance': explained_variance,
             'cumulative_variance': cumulative_variance,
-            'loadings': loadings,
-            'n_components': pca.n_components_,
-            'components_to_explain_80_percent': np.argmax(cumulative_variance >= 0.8) + 1
+            'n_components': len(explained_variance)
         }
     
     def perform_granger_causality(self, target: str, predictor: str, 
@@ -366,8 +388,8 @@ class StatisticalModeling:
         Perform Granger causality test
         
         Args:
-            target: Target variable
-            predictor: Predictor variable
+            target: Target variable name
+            predictor: Predictor variable name
             max_lags: Maximum number of lags to test
             
         Returns:
@@ -377,37 +399,33 @@ class StatisticalModeling:
             from statsmodels.tsa.stattools import grangercausalitytests
             
             # Prepare data
-            growth_data = self.data[[target, predictor]].pct_change().dropna()
+            data = self.data[[target, predictor]].dropna()
             
-            # Perform Granger causality test
-            test_data = growth_data[[predictor, target]]  # Note: order matters
-            gc_result = grangercausalitytests(test_data, maxlag=max_lags, verbose=False)
+            if len(data) < max_lags + 10:
+                return {'error': 'Insufficient data for Granger causality test'}
+            
+            # Perform test
+            gc_result = grangercausalitytests(data, maxlag=max_lags, verbose=False)
             
             # Extract results
             results = {}
             for lag in range(1, max_lags + 1):
                 if lag in gc_result:
-                    lag_result = gc_result[lag]
-                    results[lag] = {
-                        'f_statistic': lag_result[0]['ssr_ftest'][0],
-                        'p_value': lag_result[0]['ssr_ftest'][1],
-                        'is_significant': lag_result[0]['ssr_ftest'][1] < 0.05
+                    f_stat = gc_result[lag][0]['ssr_ftest']
+                    results[f'lag_{lag}'] = {
+                        'f_statistic': f_stat[0],
+                        'p_value': f_stat[1],
+                        'significant': f_stat[1] < 0.05
                     }
             
-            # Overall result (use minimum p-value)
-            min_p_value = min([result['p_value'] for result in results.values()])
-            overall_significant = min_p_value < 0.05
-            
             return {
-                'results_by_lag': results,
-                'min_p_value': min_p_value,
-                'is_causal': overall_significant,
-                'optimal_lag': min(results.keys(), key=lambda k: results[k]['p_value'])
+                'target': target,
+                'predictor': predictor,
+                'max_lags': max_lags,
+                'results': results
             }
-            
         except Exception as e:
-            logger.error(f"Granger causality test failed: {e}")
-            return {'error': str(e)}
+            return {'error': f'Granger causality test failed: {str(e)}'}
     
     def generate_statistical_report(self, regression_results: Dict = None,
                                   correlation_results: Dict = None,
@@ -423,84 +441,43 @@ class StatisticalModeling:
         Returns:
             Formatted report string
         """
-        report = "STATISTICAL MODELING REPORT\n"
-        report += "=" * 50 + "\n\n"
+        report = []
+        report.append("=== STATISTICAL ANALYSIS REPORT ===\n")
         
-        if regression_results:
-            report += "REGRESSION ANALYSIS\n"
-            report += "-" * 30 + "\n"
-            
-            # Model performance
-            performance = regression_results['performance']
-            report += f"Model Performance:\n"
-            report += f"  R²: {performance['r2']:.4f}\n"
-            report += f"  RMSE: {performance['rmse']:.4f}\n"
-            report += f"  MAE: {performance['mae']:.4f}\n\n"
+        # Regression results
+        if regression_results and 'error' not in regression_results:
+            report.append("REGRESSION ANALYSIS:")
+            perf = regression_results['performance']
+            report.append(f"- R² Score: {perf['r2']:.4f}")
+            report.append(f"- RMSE: {perf['rmse']:.4f}")
+            report.append(f"- MAE: {perf['mae']:.4f}")
             
             # Top coefficients
-            coefficients = regression_results['coefficients']
-            report += f"Top 5 Most Important Variables:\n"
-            for i, row in coefficients.head().iterrows():
-                report += f"  {row['variable']}: {row['coefficient']:.4f}\n"
-            report += "\n"
-            
-            # Diagnostics
-            diagnostics = regression_results['diagnostics']
-            report += f"Model Diagnostics:\n"
-            
-            if 'normality' in diagnostics and 'error' not in diagnostics['normality']:
-                norm = diagnostics['normality']
-                report += f"  Normality (Shapiro-Wilk): p={norm['p_value']:.4f} "
-                report += f"({'Normal' if norm['is_normal'] else 'Not Normal'})\n"
-            
-            if 'homoscedasticity' in diagnostics and 'error' not in diagnostics['homoscedasticity']:
-                hom = diagnostics['homoscedasticity']
-                report += f"  Homoscedasticity (Breusch-Pagan): p={hom['p_value']:.4f} "
-                report += f"({'Homoscedastic' if hom['is_homoscedastic'] else 'Heteroscedastic'})\n"
-            
-            if 'autocorrelation' in diagnostics and 'error' not in diagnostics['autocorrelation']:
-                autocorr = diagnostics['autocorrelation']
-                report += f"  Autocorrelation (Durbin-Watson): {autocorr['statistic']:.4f} "
-                report += f"({autocorr['interpretation']})\n"
-            
-            if 'multicollinearity' in diagnostics and 'error' not in diagnostics['multicollinearity']:
-                mult = diagnostics['multicollinearity']
-                report += f"  Multicollinearity (VIF): Mean VIF = {mult['mean_vif']:.2f}\n"
-                if mult['high_vif_variables']:
-                    report += f"    High VIF variables: {', '.join(mult['high_vif_variables'])}\n"
-            
-            report += "\n"
+            top_coeffs = regression_results['coefficients'].head(5)
+            report.append("- Top 5 coefficients:")
+            for _, row in top_coeffs.iterrows():
+                report.append(f"  {row['variable']}: {row['coefficient']:.4f}")
+            report.append("")
         
+        # Correlation results
         if correlation_results:
-            report += "CORRELATION ANALYSIS\n"
-            report += "-" * 30 + "\n"
-            report += f"Method: {correlation_results['method'].title()}\n"
-            report += f"Significant Correlations: {len(correlation_results['significant_correlations'])}\n\n"
-            
-            # Top correlations
-            report += f"Top 5 Strongest Correlations:\n"
-            for i, corr in enumerate(correlation_results['significant_correlations'][:5]):
-                report += f"  {corr['variable1']} ↔ {corr['variable2']}: "
-                report += f"{corr['correlation']:.4f} ({corr['strength']}, p={corr['p_value']:.4f})\n"
-            
-            # PCA results
-            if 'pca_analysis' in correlation_results and 'error' not in correlation_results['pca_analysis']:
-                pca = correlation_results['pca_analysis']
-                report += f"\nPrincipal Component Analysis:\n"
-                report += f"  Components to explain 80% variance: {pca['components_to_explain_80_percent']}\n"
-                report += f"  Total components: {pca['n_components']}\n"
-            
-            report += "\n"
+            report.append("CORRELATION ANALYSIS:")
+            strongest = correlation_results.get('strongest_correlations', [])
+            for pair in strongest[:3]:
+                report.append(f"- {pair['variable1']} ↔ {pair['variable2']}: "
+                           f"{pair['correlation']:.3f} ({pair['strength']})")
+            report.append("")
         
-        if causality_results:
-            report += "GRANGER CAUSALITY ANALYSIS\n"
-            report += "-" * 30 + "\n"
-            
-            for target, results in causality_results.items():
-                if 'error' not in results:
-                    report += f"{target}:\n"
-                    report += f"  Is causal: {results['is_causal']}\n"
-                    report += f"  Minimum p-value: {results['min_p_value']:.4f}\n"
-                    report += f"  Optimal lag: {results['optimal_lag']}\n\n"
+        # Causality results
+        if causality_results and 'error' not in causality_results:
+            report.append("GRANGER CAUSALITY ANALYSIS:")
+            results = causality_results.get('results', {})
+            significant_lags = [lag for lag, result in results.items() 
+                              if result.get('significant', False)]
+            if significant_lags:
+                report.append(f"- Significant causality detected at lags: {', '.join(significant_lags)}")
+            else:
+                report.append("- No significant causality detected")
+            report.append("")
         
-        return report 
+        return "\n".join(report) 

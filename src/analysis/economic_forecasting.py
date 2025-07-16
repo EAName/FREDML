@@ -37,32 +37,30 @@ class EconomicForecaster:
         self.backtest_results = {}
         self.model_performance = {}
         
-    def prepare_data(self, target_series: str, frequency: str = 'Q') -> pd.Series:
+    def prepare_data(self, target_series: str, frequency: str = 'Q', for_arima: bool = True) -> pd.Series:
         """
-        Prepare time series data for forecasting
-        
+        Prepare time series data for forecasting or analysis.
         Args:
             target_series: Series name to forecast
             frequency: Data frequency ('Q' for quarterly, 'M' for monthly)
-            
+            for_arima: If True, returns raw levels for ARIMA; if False, returns growth rate
         Returns:
             Prepared time series
         """
         if target_series not in self.data.columns:
             raise ValueError(f"Series {target_series} not found in data")
-            
         series = self.data[target_series].dropna()
-        
+        # Ensure time-based index
+        if not isinstance(series.index, pd.DatetimeIndex):
+            raise ValueError("Index must be datetime type")
         # Resample to desired frequency
         if frequency == 'Q':
             series = series.resample('Q').mean()
         elif frequency == 'M':
             series = series.resample('M').mean()
-            
-        # Calculate growth rates for economic indicators
-        if target_series in ['GDPC1', 'INDPRO', 'RSAFS']:
+        # Only use growth rates if for_arima is False
+        if not for_arima and target_series in ['GDPC1', 'INDPRO', 'RSAFS']:
             series = series.pct_change().dropna()
-            
         return series
     
     def check_stationarity(self, series: pd.Series) -> Dict:
@@ -106,39 +104,103 @@ class EconomicForecaster:
     
     def fit_arima_model(self, series: pd.Series, order: Tuple[int, int, int] = None) -> ARIMA:
         """
-        Fit ARIMA model to time series
+        Fit ARIMA model to time series using raw levels (not growth rates)
         
         Args:
-            series: Time series data
+            series: Time series data (raw levels)
             order: ARIMA order (p, d, q). If None, auto-detect
             
         Returns:
             Fitted ARIMA model
         """
+        # Ensure we're working with raw levels, not growth rates
+        if series.isna().any():
+            series = series.dropna()
+        
+        # Ensure series has enough data points
+        if len(series) < 10:
+            raise ValueError("Series must have at least 10 data points for ARIMA fitting")
+        
+
+        
         if order is None:
-            # Auto-detect order using AIC minimization
+            # Auto-detect order using AIC minimization with improved search
             best_aic = np.inf
             best_order = (1, 1, 1)
             
-            for p in range(0, 3):
-                for d in range(0, 2):
-                    for q in range(0, 3):
-                        try:
-                            model = ARIMA(series, order=(p, d, q))
-                            fitted_model = model.fit()
-                            if fitted_model.aic < best_aic:
-                                best_aic = fitted_model.aic
-                                best_order = (p, d, q)
-                        except:
+            # Improved order search that avoids degenerate models
+            # Start with more reasonable orders to avoid ARIMA(0,0,0)
+            search_orders = [
+                (1, 1, 1), (2, 1, 1), (1, 1, 2), (2, 1, 2),  # Common orders
+                (0, 1, 1), (1, 0, 1), (1, 1, 0),  # Simple orders
+                (2, 0, 1), (1, 0, 2), (2, 1, 0),  # Alternative orders
+                (3, 1, 1), (1, 1, 3), (2, 2, 1), (1, 2, 2),  # Higher orders
+            ]
+            
+            for p, d, q in search_orders:
+                try:
+                    model = ARIMA(series, order=(p, d, q))
+                    fitted_model = model.fit()
+                    
+                    # Check if model is degenerate (all parameters near zero)
+                    params = fitted_model.params
+                    if len(params) > 0:
+                        # Skip models where all AR/MA parameters are very small
+                        ar_params = params[1:p+1] if p > 0 else []
+                        ma_params = params[p+1:p+1+q] if q > 0 else []
+                        
+                        # Check if model is essentially a random walk or constant
+                        if (p == 0 and d == 0 and q == 0) or \
+                           (p == 0 and d == 1 and q == 0) or \
+                           (len(ar_params) > 0 and all(abs(p) < 0.01 for p in ar_params)) or \
+                           (len(ma_params) > 0 and all(abs(p) < 0.01 for p in ma_params)):
+                            logger.debug(f"Skipping degenerate ARIMA({p},{d},{q})")
                             continue
+                    
+                    if fitted_model.aic < best_aic:
+                        best_aic = fitted_model.aic
+                        best_order = (p, d, q)
+                        logger.debug(f"New best ARIMA({p},{d},{q}) with AIC: {best_aic}")
+                        
+                except Exception as e:
+                    logger.debug(f"ARIMA({p},{d},{q}) failed: {e}")
+                    continue
             
             order = best_order
-            logger.info(f"Auto-detected ARIMA order: {order}")
+            logger.info(f"Auto-detected ARIMA order: {order} with AIC: {best_aic}")
+            
+            # If we still have a degenerate model, force a reasonable order
+            if order == (0, 0, 0) or order == (0, 1, 0):
+                logger.warning("Detected degenerate ARIMA order, forcing to ARIMA(1,1,1)")
+                order = (1, 1, 1)
         
-        model = ARIMA(series, order=order)
-        fitted_model = model.fit()
-        
-        return fitted_model
+        try:
+            model = ARIMA(series, order=order)
+            fitted_model = model.fit()
+            
+            # Debug: Log model parameters
+            logger.info(f"ARIMA model fitted successfully with AIC: {fitted_model.aic}")
+            logger.info(f"ARIMA order: {order}")
+            logger.info(f"Model parameters: {fitted_model.params}")
+            
+            return fitted_model
+        except Exception as e:
+            logger.warning(f"ARIMA fitting failed with order {order}: {e}")
+            # Try fallback orders
+            fallback_orders = [(1, 1, 1), (0, 1, 1), (1, 0, 1), (1, 1, 0)]
+            for fallback_order in fallback_orders:
+                try:
+                    model = ARIMA(series, order=fallback_order)
+                    fitted_model = model.fit()
+                    logger.info(f"ARIMA fallback model fitted with order {fallback_order}")
+                    return fitted_model
+                except Exception as fallback_e:
+                    logger.debug(f"Fallback ARIMA{fallback_order} failed: {fallback_e}")
+                    continue
+            
+            # Last resort: simple moving average
+            logger.warning("All ARIMA models failed, using simple moving average")
+            raise ValueError("Unable to fit any ARIMA model to the data")
     
     def fit_ets_model(self, series: pd.Series, seasonal_periods: int = 4) -> ExponentialSmoothing:
         """
@@ -201,19 +263,54 @@ class EconomicForecaster:
         else:
             raise ValueError("model_type must be 'arima', 'ets', or 'auto'")
         
-        # Generate forecast
-        forecast = model.forecast(steps=forecast_periods)
-        
-        # Calculate confidence intervals
+        # Generate forecast using proper method for each model type
         if model_type == 'arima':
-            forecast_ci = model.get_forecast(steps=forecast_periods).conf_int()
+            # Use get_forecast() for ARIMA to get proper confidence intervals
+            forecast_result = model.get_forecast(steps=forecast_periods)
+            forecast = forecast_result.predicted_mean
+            
+
+            
+            try:
+                forecast_ci = forecast_result.conf_int()
+                # Check if confidence intervals are valid (not all NaN)
+                if forecast_ci.isna().all().all() or forecast_ci.empty:
+                    # Improved fallback confidence intervals
+                    forecast_ci = self._calculate_improved_confidence_intervals(forecast, series, model)
+                else:
+                    # Ensure confidence intervals have proper column names
+                    if len(forecast_ci.columns) >= 2:
+                        forecast_ci.columns = ['lower', 'upper']
+                    else:
+                        # Improved fallback if column structure is unexpected
+                        forecast_ci = self._calculate_improved_confidence_intervals(forecast, series, model)
+                
+                # Debug: Log confidence intervals
+                logger.info(f"ARIMA confidence intervals: {forecast_ci.to_dict()}")
+                
+                # Check if confidence intervals are too wide and provide warning
+                ci_widths = forecast_ci['upper'] - forecast_ci['lower']
+                mean_width = ci_widths.mean()
+                forecast_mean = forecast.mean()
+                relative_width = mean_width / abs(forecast_mean) if abs(forecast_mean) > 0 else 0
+                
+                if relative_width > 0.5:  # If confidence interval is more than 50% of forecast value
+                    logger.warning(f"Confidence intervals are very wide (relative width: {relative_width:.2%})")
+                    logger.info("This may indicate high uncertainty or model instability")
+                
+            except Exception as e:
+                logger.warning(f"ARIMA confidence interval calculation failed: {e}")
+                # Improved fallback confidence intervals
+                forecast_ci = self._calculate_improved_confidence_intervals(forecast, series, model)
         else:
-            # For ETS, use simple confidence intervals
-            forecast_std = series.std()
-            forecast_ci = pd.DataFrame({
-                'lower': forecast - 1.96 * forecast_std,
-                'upper': forecast + 1.96 * forecast_std
-            })
+            # For ETS, use forecast() method
+            forecast = model.forecast(steps=forecast_periods)
+            # Use improved confidence intervals for ETS
+            forecast_ci = self._calculate_improved_confidence_intervals(forecast, series, model)
+        
+        # Debug: Log final results
+        logger.info(f"Final forecast is flat: {len(set(forecast)) == 1}")
+        logger.info(f"Forecast type: {type(forecast)}")
         
         return {
             'model': model,
@@ -222,6 +319,65 @@ class EconomicForecaster:
             'confidence_intervals': forecast_ci,
             'aic': model.aic if hasattr(model, 'aic') else None
         }
+    
+    def _calculate_improved_confidence_intervals(self, forecast: pd.Series, series: pd.Series, model) -> pd.DataFrame:
+        """
+        Calculate improved confidence intervals with better uncertainty quantification
+        
+        Args:
+            forecast: Forecast values
+            series: Original time series
+            model: Fitted model
+            
+        Returns:
+            DataFrame with improved confidence intervals
+        """
+        try:
+            # Calculate forecast errors from model residuals if available
+            if hasattr(model, 'resid') and len(model.resid) > 0:
+                # Use model residuals for more accurate uncertainty
+                residuals = model.resid.dropna()
+                forecast_std = residuals.std()
+                
+                # Adjust for forecast horizon (uncertainty increases with horizon)
+                horizon_factors = np.sqrt(np.arange(1, len(forecast) + 1))
+                confidence_intervals = []
+                
+                for i, (fcast, factor) in enumerate(zip(forecast, horizon_factors)):
+                    # Use 95% confidence interval (1.96 * std)
+                    margin = 1.96 * forecast_std * factor
+                    lower = fcast - margin
+                    upper = fcast + margin
+                    confidence_intervals.append({'lower': lower, 'upper': upper})
+                
+                return pd.DataFrame(confidence_intervals, index=forecast.index)
+            
+            else:
+                # Fallback to series-based uncertainty
+                series_std = series.std()
+                # Use a more conservative approach for economic data
+                # Economic forecasts typically have higher uncertainty
+                uncertainty_factor = 1.5  # Adjust based on data characteristics
+                
+                confidence_intervals = []
+                for i, fcast in enumerate(forecast):
+                    # Increase uncertainty with forecast horizon
+                    horizon_factor = 1 + (i * 0.1)  # 10% increase per period
+                    margin = 1.96 * series_std * uncertainty_factor * horizon_factor
+                    lower = fcast - margin
+                    upper = fcast + margin
+                    confidence_intervals.append({'lower': lower, 'upper': upper})
+                
+                return pd.DataFrame(confidence_intervals, index=forecast.index)
+                
+        except Exception as e:
+            logger.warning(f"Improved confidence interval calculation failed: {e}")
+            # Ultimate fallback
+            series_std = series.std()
+            return pd.DataFrame({
+                'lower': forecast - 1.96 * series_std,
+                'upper': forecast + 1.96 * series_std
+            }, index=forecast.index)
     
     def backtest_forecast(self, series: pd.Series, model_type: str = 'auto',
                          train_size: float = 0.8, test_periods: int = 8) -> Dict:
@@ -271,7 +427,12 @@ class EconomicForecaster:
         mae = mean_absolute_error(actual_values, predicted_values)
         mse = mean_squared_error(actual_values, predicted_values)
         rmse = np.sqrt(mse)
-        mape = np.mean(np.abs(np.array(actual_values) - np.array(predicted_values)) / np.abs(actual_values)) * 100
+        
+        # Use safe MAPE calculation to avoid division by zero
+        actual_array = np.array(actual_values)
+        predicted_array = np.array(predicted_values)
+        denominator = np.maximum(np.abs(actual_array), 1e-8)
+        mape = np.mean(np.abs((actual_array - predicted_array) / denominator)) * 100
         
         return {
             'actual_values': actual_values,
@@ -301,19 +462,22 @@ class EconomicForecaster:
         
         for indicator in indicators:
             try:
-                # Prepare data
-                series = self.prepare_data(indicator)
+                # Prepare raw data for forecasting (use raw levels, not growth rates)
+                series = self.prepare_data(indicator, for_arima=True)
                 
-                # Check stationarity
-                stationarity = self.check_stationarity(series)
+                # Prepare growth rates for analysis
+                growth_series = self.prepare_data(indicator, for_arima=False)
                 
-                # Decompose series
-                decomposition = self.decompose_series(series)
+                # Check stationarity on growth rates
+                stationarity = self.check_stationarity(growth_series)
                 
-                # Generate forecast
+                # Decompose growth rates
+                decomposition = self.decompose_series(growth_series)
+                
+                # Generate forecast using raw levels
                 forecast_result = self.forecast_series(series)
                 
-                # Perform backtest
+                # Perform backtest on raw levels
                 backtest_result = self.backtest_forecast(series)
                 
                 results[indicator] = {
@@ -321,7 +485,8 @@ class EconomicForecaster:
                     'decomposition': decomposition,
                     'forecast': forecast_result,
                     'backtest': backtest_result,
-                    'series': series
+                    'raw_series': series,
+                    'growth_series': growth_series
                 }
                 
                 logger.info(f"Successfully forecasted {indicator}")
@@ -332,58 +497,27 @@ class EconomicForecaster:
         
         return results
     
-    def generate_forecast_report(self, forecasts: Dict) -> str:
+    def generate_forecast_report(self, forecast_result, periods=None):
         """
-        Generate comprehensive forecast report
-        
+        Generate a markdown table for forecast results.
         Args:
-            forecasts: Dictionary with forecast results
-            
+            forecast_result: dict with keys 'forecast', 'confidence_intervals'
+            periods: list of period labels (optional)
         Returns:
-            Formatted report string
+            Markdown string
         """
-        report = "ECONOMIC FORECASTING REPORT\n"
-        report += "=" * 50 + "\n\n"
-        
-        for indicator, result in forecasts.items():
-            if 'error' in result:
-                report += f"{indicator}: ERROR - {result['error']}\n\n"
-                continue
-                
-            report += f"INDICATOR: {indicator}\n"
-            report += "-" * 30 + "\n"
-            
-            # Stationarity results
-            stationarity = result['stationarity']
-            report += f"Stationarity Test (ADF):\n"
-            report += f"  ADF Statistic: {stationarity['adf_statistic']:.4f}\n"
-            report += f"  P-value: {stationarity['p_value']:.4f}\n"
-            report += f"  Is Stationary: {stationarity['is_stationary']}\n\n"
-            
-            # Model information
-            forecast = result['forecast']
-            report += f"Model: {forecast['model_type'].upper()}\n"
-            if forecast['aic']:
-                report += f"AIC: {forecast['aic']:.4f}\n"
-            report += f"Forecast Periods: {len(forecast['forecast'])}\n\n"
-            
-            # Backtest results
-            backtest = result['backtest']
-            if 'error' not in backtest:
-                report += f"Backtest Performance:\n"
-                report += f"  MAE: {backtest['mae']:.4f}\n"
-                report += f"  RMSE: {backtest['rmse']:.4f}\n"
-                report += f"  MAPE: {backtest['mape']:.2f}%\n"
-                report += f"  Test Periods: {backtest['test_periods']}\n\n"
-            
-            # Forecast values
-            report += f"Forecast Values:\n"
-            for i, value in enumerate(forecast['forecast']):
-                ci = forecast['confidence_intervals']
-                lower = ci.iloc[i]['lower'] if 'lower' in ci.columns else 'N/A'
-                upper = ci.iloc[i]['upper'] if 'upper' in ci.columns else 'N/A'
-                report += f"  Period {i+1}: {value:.4f} [{lower:.4f}, {upper:.4f}]\n"
-            
-            report += "\n" + "=" * 50 + "\n\n"
-        
-        return report 
+        forecast = forecast_result.get('forecast')
+        ci = forecast_result.get('confidence_intervals')
+        if forecast is None or ci is None:
+            return 'No forecast results available.'
+        if periods is None:
+            periods = [f"Period {i+1}" for i in range(len(forecast))]
+        lines = ["| Period  | Forecast      | 95% CI Lower | 95% CI Upper |", "| ------- | ------------- | ------------ | ------------ |"]
+        for i, (f, p) in enumerate(zip(forecast, periods)):
+            try:
+                lower = ci.iloc[i, 0] if hasattr(ci, 'iloc') else ci[i][0]
+                upper = ci.iloc[i, 1] if hasattr(ci, 'iloc') else ci[i][1]
+            except Exception:
+                lower = upper = 'N/A'
+            lines.append(f"| {p} | **{f:,.2f}** | {lower if isinstance(lower, str) else f'{lower:,.2f}'} | {upper if isinstance(upper, str) else f'{upper:,.2f}'} |")
+        return '\n'.join(lines) 

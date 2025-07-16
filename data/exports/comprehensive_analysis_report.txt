@@ -1,0 +1,36 @@
+================================================================================
+FRED ML - COMPREHENSIVE ECONOMIC ANALYSIS REPORT
+================================================================================
+
+Report Generated: 2025-07-16 21:18:16
+Analysis Period: 1990-03-31 to 2025-03-31
+Economic Indicators: GDPC1, INDPRO, RSAFS
+Total Observations: 141
+
+DATA QUALITY SUMMARY:
+----------------------------------------
+missing_data:
+outliers:
+  INDPRO: 8.5% outliers
+
+STATISTICAL MODELING SUMMARY:
+----------------------------------------
+Regression Analysis:
+
+FORECASTING SUMMARY:
+----------------------------------------
+GDPC1: Forecast generated
+INDPRO: Forecast generated
+RSAFS: Forecast generated
+
+KEY INSIGHTS:
+----------------------------------------
+• Analysis covers 3 economic indicators from 1990-03 to 2025-03
+• Dataset contains 141 observations with 423 total data points
+• Generated 3 forecasting insights
+• Generated 2 segmentation insights
+• Generated 0 statistical insights
+
+================================================================================
+END OF REPORT
+================================================================================

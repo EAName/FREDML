@@ -119,24 +119,17 @@ class EnhancedFREDClient:
             series_id: FRED series ID
             start_date: Start date
             end_date: End date
-            frequency: Data frequency
+            frequency: Data frequency (for post-processing)
             
         Returns:
             Series data or None if failed
         """
         try:
-            # Determine appropriate frequency for each series
-            if frequency == 'auto':
-                freq = self._get_appropriate_frequency(series_id)
-            else:
-                freq = frequency
-            
-            # Fetch data
+            # Fetch data without frequency parameter (FRED API doesn't support it)
             series = self.fred.get_series(
                 series_id,
                 observation_start=start_date,
-                observation_end=end_date,
-                frequency=freq
+                observation_end=end_date
             )
             
             if series.empty:
@@ -146,12 +139,29 @@ class EnhancedFREDClient:
             # Handle frequency conversion if needed
             if frequency == 'auto':
                 series = self._standardize_frequency(series, series_id)
+            elif frequency == 'Q':
+                # Convert to quarterly if requested
+                series = self._convert_to_quarterly(series, series_id)
+            elif frequency == 'M':
+                # Convert to monthly if requested
+                series = self._convert_to_monthly(series, series_id)
             
             return series
             
         except Exception as e:
             logger.error(f"Error fetching {series_id}: {e}")
             return None
+    
+    def _convert_to_quarterly(self, series: pd.Series, series_id: str) -> pd.Series:
+        """Convert series to quarterly frequency"""
+        if series_id in ['INDPRO', 'RSAFS', 'TCU', 'PAYEMS', 'CPIAUCSL', 'M2SL']:
+            return series.resample('Q').last()
+        else:
+            return series.resample('Q').mean()
+    
+    def _convert_to_monthly(self, series: pd.Series, series_id: str) -> pd.Series:
+        """Convert series to monthly frequency"""
+        return series.resample('M').last()
     
     def _get_appropriate_frequency(self, series_id: str) -> str:
         """
@@ -282,51 +292,105 @@ class EnhancedFREDClient:
     
     def validate_data_quality(self, data: pd.DataFrame) -> Dict:
         """
-        Validate data quality and completeness
+        Validate data quality and check for common issues
         
         Args:
-            data: Economic data DataFrame
+            data: DataFrame with economic indicators
             
         Returns:
-            Dictionary with quality metrics
+            Dictionary with validation results
         """
-        quality_report = {
-            'total_series': len(data.columns),
-            'total_observations': len(data),
-            'date_range': {
-                'start': data.index.min().strftime('%Y-%m-%d'),
-                'end': data.index.max().strftime('%Y-%m-%d')
-            },
+        validation_results = {
             'missing_data': {},
-            'data_quality': {}
+            'outliers': {},
+            'data_quality_score': 0.0,
+            'warnings': [],
+            'errors': []
         }
         
-        for column in data.columns:
-            series = data[column]
-            
-            # Missing data analysis
-            missing_count = series.isna().sum()
-            missing_pct = (missing_count / len(series)) * 100
-            
-            quality_report['missing_data'][column] = {
-                'missing_count': missing_count,
-                'missing_percentage': missing_pct,
-                'completeness': 100 - missing_pct
-            }
-            
-            # Data quality metrics
-            if not series.isna().all():
-                non_null_series = series.dropna()
-                quality_report['data_quality'][column] = {
-                    'mean': non_null_series.mean(),
-                    'std': non_null_series.std(),
-                    'min': non_null_series.min(),
-                    'max': non_null_series.max(),
-                    'skewness': non_null_series.skew(),
-                    'kurtosis': non_null_series.kurtosis()
-                }
+        total_series = len(data.columns)
+        valid_series = 0
         
-        return quality_report
+        for column in data.columns:
+            series = data[column].dropna()
+            
+            if len(series) == 0:
+                validation_results['missing_data'][column] = 'No data available'
+                validation_results['errors'].append(f"{column}: No data available")
+                continue
+            
+            # Check for missing data
+            missing_pct = (data[column].isna().sum() / len(data)) * 100
+            if missing_pct > 20:
+                validation_results['missing_data'][column] = f"{missing_pct:.1f}% missing"
+                validation_results['warnings'].append(f"{column}: {missing_pct:.1f}% missing data")
+            
+            # Check for outliers using IQR method
+            Q1 = series.quantile(0.25)
+            Q3 = series.quantile(0.75)
+            IQR = Q3 - Q1
+            lower_bound = Q1 - 1.5 * IQR
+            upper_bound = Q3 + 1.5 * IQR
+            
+            outliers = series[(series < lower_bound) | (series > upper_bound)]
+            outlier_pct = (len(outliers) / len(series)) * 100
+            
+            if outlier_pct > 5:
+                validation_results['outliers'][column] = f"{outlier_pct:.1f}% outliers"
+                validation_results['warnings'].append(f"{column}: {outlier_pct:.1f}% outliers detected")
+            
+            # Validate scaling for known indicators
+            self._validate_economic_scaling(series, column, validation_results)
+            
+            valid_series += 1
+        
+        # Calculate overall data quality score
+        if total_series > 0:
+            validation_results['data_quality_score'] = (valid_series / total_series) * 100
+        
+        return validation_results
+    
+    def _validate_economic_scaling(self, series: pd.Series, indicator: str, validation_results: Dict):
+        """
+        Validate economic indicator scaling using expected ranges
+        
+        Args:
+            series: Time series data
+            indicator: Indicator name
+            validation_results: Validation results dictionary to update
+        """
+        # Expected ranges for common economic indicators
+        scaling_ranges = {
+            'GDPC1': (15000, 25000),  # Real GDP in billions (2020-2024 range)
+            'INDPRO': (90, 110),       # Industrial Production Index
+            'CPIAUCSL': (250, 350),    # Consumer Price Index
+            'FEDFUNDS': (0, 10),       # Federal Funds Rate (%)
+            'DGS10': (0, 8),           # 10-Year Treasury Rate (%)
+            'UNRATE': (3, 15),         # Unemployment Rate (%)
+            'PAYEMS': (140000, 160000), # Total Nonfarm Payrolls (thousands)
+            'PCE': (15000, 25000),     # Personal Consumption Expenditures (billions)
+            'M2SL': (20000, 25000),    # M2 Money Stock (billions)
+            'TCU': (60, 90),           # Capacity Utilization (%)
+            'DEXUSEU': (0.8, 1.2),     # US/Euro Exchange Rate
+            'RSAFS': (400000, 600000)  # Retail Sales (millions)
+        }
+        
+        if indicator in scaling_ranges:
+            expected_min, expected_max = scaling_ranges[indicator]
+            
+            # Check if values fall within expected range
+            vals = series.dropna()
+            if len(vals) > 0:
+                mask = (vals < expected_min) | (vals > expected_max)
+                outlier_pct = mask.mean() * 100
+                
+                if outlier_pct > 5:
+                    validation_results['warnings'].append(
+                        f"{indicator}: {outlier_pct:.1f}% of data outside expected range "
+                        f"[{expected_min}, {expected_max}]. Check for scaling/unit issues."
+                    )
+                else:
+                    logger.debug(f"{indicator}: data within expected range [{expected_min}, {expected_max}]")
     
     def generate_data_summary(self, data: pd.DataFrame) -> str:
         """

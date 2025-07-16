@@ -23,8 +23,9 @@ logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 
 # Initialize AWS clients
-s3_client = boto3.client('s3')
-lambda_client = boto3.client('lambda')
+aws_region = os.environ.get('AWS_REGION', 'us-east-1')
+s3_client = boto3.client('s3', region_name=aws_region)
+lambda_client = boto3.client('lambda', region_name=aws_region)
 
 # Configuration
 FRED_API_KEY = os.environ.get('FRED_API_KEY')

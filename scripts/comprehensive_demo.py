@@ -11,7 +11,8 @@ from datetime import datetime
 from pathlib import Path
 
 # Add src to path
-sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'src'))
+project_root = Path(__file__).parent.parent
+sys.path.append(str(project_root))
 
 from src.analysis.comprehensive_analytics import ComprehensiveAnalytics
 from src.core.enhanced_fred_client import EnhancedFREDClient
